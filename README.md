@@ -1,0 +1,115 @@
+# AI Adoption Assessment Portal
+
+A full-stack monthly employee AI adoption assessment built with Next.js App Router,
+TypeScript, Tailwind CSS, and Supabase Postgres.
+
+## Features
+
+- Mobile-friendly public employee assessment
+- One submission per employee per calendar month
+- Signed, HTTP-only admin session cookie
+- Protected admin submission and review workflow
+- Department-specific AAM normalization
+- Monthly rankings with bottom-five flags
+- CSV export
+- Supabase constraints and Row Level Security
+
+## Local setup
+
+### 1. Install dependencies
+
+Use Node.js 20 or newer.
+
+```bash
+npm install
+```
+
+### 2. Create Supabase tables
+
+1. Create a free project at [Supabase](https://supabase.com).
+2. Open the project's SQL Editor.
+3. Run the full contents of
+   `supabase/migrations/001_initial_schema.sql`.
+
+The migration creates both tables, database constraints, indexes, and RLS policies.
+The public `anon` role can only insert pending submissions. Admin APIs use the
+service role after validating the signed admin cookie.
+
+### 3. Configure environment variables
+
+Copy `.env.example` to `.env.local` and fill in:
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-long-random-password
+SESSION_SECRET=your-random-secret-of-at-least-32-characters
+```
+
+Find the Supabase URL and keys under **Project Settings > API**. Never expose the
+service role key in client code or commit `.env.local`.
+
+Generate strong secrets with:
+
+```bash
+openssl rand -base64 24
+openssl rand -base64 48
+```
+
+Use the first value for `ADMIN_PASSWORD` and the second for `SESSION_SECRET`.
+
+### 4. Run locally
+
+```bash
+npm run dev
+```
+
+Open:
+
+- Employee form: [http://localhost:3000](http://localhost:3000)
+- Admin login: [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
+
+## Deploy to GitHub and Vercel
+
+1. Create a Git repository and push this project to GitHub.
+2. Import the repository into [Vercel](https://vercel.com).
+3. Add all six variables from `.env.example` in the Vercel project settings.
+4. Deploy. Vercel detects Next.js automatically.
+
+Use separate Supabase projects and credentials for preview/production environments
+if test data must remain isolated.
+
+## Application routes
+
+| Route | Purpose |
+| --- | --- |
+| `/` | Public employee assessment |
+| `/admin/login` | Admin login |
+| `/admin` | Protected submissions and rankings dashboard |
+| `/admin/submissions/[id]` | Protected review editor |
+
+All `/api/admin/*` endpoints independently validate the signed session cookie.
+Middleware also redirects unauthenticated admin page requests to the login screen.
+
+## Scoring
+
+Admins enter eight integer scores from 1 to 10. The server calculates:
+
+```text
+raw_score = q0 + q1 + q2 + q3 + q4 + q5 + q6 + q7
+normalized_score = raw_score / department_aam
+```
+
+The normalized score is rounded to one decimal place. Unknown departments use an
+AAM of `0.75`, though the public form only permits configured departments.
+
+## Useful commands
+
+```bash
+npm run dev
+npm run typecheck
+npm run lint
+npm run build
+```
