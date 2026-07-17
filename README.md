@@ -9,6 +9,7 @@ TypeScript, Tailwind CSS, and Supabase Postgres.
 - One submission per employee per calendar month
 - Signed, HTTP-only admin session cookie
 - Protected admin submission and review workflow
+- Month 2 assessment fields with backward-compatible legacy submissions
 - Q0 link and proof-file uploads through Supabase Storage
 - Monthly rankings with final-score flags
 - CSV export
@@ -95,7 +96,9 @@ Middleware also redirects unauthenticated admin page requests to the login scree
 
 ## Scoring
 
-Admins enter eight integer scores from 1 to 10. The server calculates:
+Admins enter eight integer scores from 1 to 10. For Month 2, the eight manual
+scores map to Q1 through Q8. Q0 proof, Q9, and Q10 are informational only. The
+server calculates:
 
 ```text
 raw_score = q0 + q1 + q2 + q3 + q4 + q5 + q6 + q7

@@ -49,4 +49,45 @@ export const Q7_OPTIONS = [
   "Significantly better",
 ] as const;
 
+export const Q1_FREQUENCY_OPTIONS = [
+  "Daily",
+  "A few times a week",
+  "Weekly",
+  "A few times a month",
+  "Rarely or never",
+] as const;
+
+export const Q3_IMPACT_OPTIONS = [
+  "No measurable impact",
+  "Helps complete a few tasks faster",
+  "Saves meaningful time every week",
+  "Allows me to handle more work than before",
+  "Has significantly changed my productivity",
+] as const;
+
+export const Q5_WORKFLOW_OPTIONS = [
+  "Not part of any process",
+  "Used occasionally",
+  "Routine in 1 process",
+  "Routine in multiple processes",
+  "Changed how my team works",
+] as const;
+
+export const Q9_CHANGE_OPTIONS = [
+  "I use AI much less than before",
+  "I use AI slightly less than before",
+  "About the same",
+  "I use AI slightly more than before",
+  "I use AI significantly more than before",
+] as const;
+
+export const Q10_BLOCKER_OPTIONS = [
+  "Access",
+  "Time",
+  "Task doesn't suit AI",
+  "Privacy concerns",
+  "Don't know where to start",
+  "No real blocker",
+] as const;
+
 export const SESSION_COOKIE_NAME = "ai_adoption_admin_session";

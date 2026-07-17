@@ -7,6 +7,17 @@ export type Submission = {
   month_year: string;
   q0_proof: string | null;
   q0_file_url: string | null;
+  q1_choice: string | null;
+  q2_task_text: string | null;
+  q3_impact_choice: string | null;
+  q4_problem_text: string | null;
+  q5_workflow_choice: string | null;
+  q6_teaching_text: string | null;
+  q7_outcome_text: string | null;
+  q8_wrong_result_text: string | null;
+  q9_change_choice: string | null;
+  q9_change_text: string | null;
+  q10_blocker_choice: string | null;
   q1_scale: number;
   q2_text: string;
   q3_text: string;

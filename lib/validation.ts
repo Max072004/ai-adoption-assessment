@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { DEPARTMENTS, Q6_OPTIONS, Q7_OPTIONS } from "@/lib/constants";
+import {
+  DEPARTMENTS,
+  Q10_BLOCKER_OPTIONS,
+  Q1_FREQUENCY_OPTIONS,
+  Q3_IMPACT_OPTIONS,
+  Q5_WORKFLOW_OPTIONS,
+  Q9_CHANGE_OPTIONS,
+} from "@/lib/constants";
 
 const requiredText = z.string().trim().min(1).max(5000);
 const optionalText = z
@@ -18,22 +25,24 @@ export const submissionSchema = z
     role: z.string().trim().min(1).max(200),
     q0_proof: optionalText,
     q0_file_url: optionalText,
-    q1_scale: z.coerce.number().int().min(1).max(10),
-    q2_text: requiredText,
-    q3_text: requiredText,
-    q4_text: requiredText,
-    q5_yesno: z.enum(["Yes", "No"]),
-    q5_detail: optionalText,
-    q6_choice: z.enum(Q6_OPTIONS),
-    q7_choice: z.enum(Q7_OPTIONS),
-    q8_text: optionalText,
+    q1_choice: z.enum(Q1_FREQUENCY_OPTIONS),
+    q2_task_text: requiredText,
+    q3_impact_choice: z.enum(Q3_IMPACT_OPTIONS),
+    q4_problem_text: requiredText,
+    q5_workflow_choice: z.enum(Q5_WORKFLOW_OPTIONS),
+    q6_teaching_text: requiredText,
+    q7_outcome_text: requiredText,
+    q8_wrong_result_text: requiredText,
+    q9_change_choice: z.enum(Q9_CHANGE_OPTIONS),
+    q9_change_text: optionalText,
+    q10_blocker_choice: z.enum(Q10_BLOCKER_OPTIONS),
   })
   .superRefine((data, ctx) => {
-    if (data.q5_yesno === "Yes" && !data.q5_detail) {
+    if (!data.q0_proof && !data.q0_file_url) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["q5_detail"],
-        message: "Please tell us which tool or feature you tried.",
+        path: ["q0_proof"],
+        message: "Please provide a Q0 proof link or upload a proof file.",
       });
     }
   });

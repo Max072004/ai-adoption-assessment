@@ -1,7 +1,13 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { Q6_OPTIONS, Q7_OPTIONS } from "@/lib/constants";
+import {
+  Q10_BLOCKER_OPTIONS,
+  Q1_FREQUENCY_OPTIONS,
+  Q3_IMPACT_OPTIONS,
+  Q5_WORKFLOW_OPTIONS,
+  Q9_CHANGE_OPTIONS,
+} from "@/lib/constants";
 
 type FormState = {
   employee_id: string;
@@ -9,15 +15,17 @@ type FormState = {
   department: string;
   role: string;
   q0_proof: string;
-  q1_scale: number;
-  q2_text: string;
-  q3_text: string;
-  q4_text: string;
-  q5_yesno: "" | "Yes" | "No";
-  q5_detail: string;
-  q6_choice: string;
-  q7_choice: string;
-  q8_text: string;
+  q1_choice: string;
+  q2_task_text: string;
+  q3_impact_choice: string;
+  q4_problem_text: string;
+  q5_workflow_choice: string;
+  q6_teaching_text: string;
+  q7_outcome_text: string;
+  q8_wrong_result_text: string;
+  q9_change_choice: string;
+  q9_change_text: string;
+  q10_blocker_choice: string;
 };
 
 const initialState: FormState = {
@@ -26,15 +34,17 @@ const initialState: FormState = {
   department: "",
   role: "",
   q0_proof: "",
-  q1_scale: 5,
-  q2_text: "",
-  q3_text: "",
-  q4_text: "",
-  q5_yesno: "",
-  q5_detail: "",
-  q6_choice: "",
-  q7_choice: "",
-  q8_text: "",
+  q1_choice: "",
+  q2_task_text: "",
+  q3_impact_choice: "",
+  q4_problem_text: "",
+  q5_workflow_choice: "",
+  q6_teaching_text: "",
+  q7_outcome_text: "",
+  q8_wrong_result_text: "",
+  q9_change_choice: "",
+  q9_change_text: "",
+  q10_blocker_choice: "",
 };
 
 const SECTIONS = [
@@ -275,16 +285,21 @@ export function EmployeeForm() {
   const sectionCompletion = useMemo(
     () => [
       [form.employee_id, form.name, form.department, form.role].every(Boolean),
-      Boolean(form.q2_text),
-      Boolean(form.q3_text && form.q4_text),
       Boolean(
-        form.q5_yesno &&
-          (form.q5_yesno === "No" || form.q5_detail) &&
-          form.q6_choice,
+        (form.q0_proof || q0File) &&
+          form.q1_choice &&
+          form.q2_task_text,
       ),
-      Boolean(form.q7_choice),
+      Boolean(form.q3_impact_choice && form.q4_problem_text),
+      Boolean(
+        form.q5_workflow_choice &&
+          form.q6_teaching_text &&
+          form.q7_outcome_text &&
+          form.q8_wrong_result_text,
+      ),
+      Boolean(form.q9_change_choice && form.q10_blocker_choice),
     ],
-    [form],
+    [form, q0File],
   );
   const completedSections = sectionCompletion.filter(Boolean).length;
   const progress = Math.round((completedSections / SECTIONS.length) * 100);
@@ -484,12 +499,12 @@ export function EmployeeForm() {
             id="usage"
             number="02"
             title="Usage Snapshot"
-            description="Show us where AI appeared in your actual work this month."
+            description="Show evidence and describe how often AI appeared in your actual work."
           >
             <Question
               number="Q0"
-              title="Share one piece of AI-assisted work from this month."
-              helper="Optional: paste a link or upload a PNG, JPG, JPEG, or PDF proof file."
+              title="AI Work Evidence"
+              helper="Required: share evidence of AI-assisted work completed this month. Use a link or upload a PNG, JPG, JPEG, or PDF proof file."
             >
               <div className="space-y-4">
                 <label className="label">
@@ -504,7 +519,9 @@ export function EmployeeForm() {
                 </label>
                 <label className="label">
                   Proof file
-                  <span className="helper">PNG, JPG, JPEG, or PDF up to 10 MB</span>
+                  <span className="helper">
+                    Screenshot or PDF upload, up to 10 MB
+                  </span>
                   <input
                     className="field file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-xs file:font-medium file:text-zinc-200 hover:file:bg-zinc-700"
                     type="file"
@@ -519,56 +536,25 @@ export function EmployeeForm() {
 
             <Question
               number="Q1"
-              title="How much of your daily work currently involves AI tools?"
-              helper="Move the slider from 1 (none at all) to 10 (central to almost everything)."
+              title="In the last 30 days, how often did you use AI for actual work tasks?"
             >
-              <div className="rounded-2xl border border-zinc-800 bg-[#0d0d0d] p-5 sm:p-6">
-                <div className="mb-7 flex items-end justify-between">
-                  <div>
-                    <p className="text-xs text-zinc-500">Current response</p>
-                    <p className="mt-1 text-sm font-medium text-zinc-300">
-                      {form.q1_scale <= 3
-                        ? "Occasional use"
-                        : form.q1_scale <= 6
-                          ? "Regular use"
-                          : form.q1_scale <= 8
-                            ? "Frequent use"
-                            : "Core to my workflow"}
-                    </p>
-                  </div>
-                  <output className="text-4xl font-semibold tracking-tight text-white">
-                    {form.q1_scale}
-                    <span className="text-base font-normal text-zinc-600"> / 10</span>
-                  </output>
-                </div>
-                <input
-                  className="w-full"
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={form.q1_scale}
-                  onChange={(event) => update("q1_scale", Number(event.target.value))}
-                  required
-                  style={{
-                    background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(form.q1_scale - 1) * 11.11}%, #27272a ${(form.q1_scale - 1) * 11.11}%, #27272a 100%)`,
-                  }}
-                />
-                <div className="mt-3 flex justify-between text-[11px] text-zinc-600">
-                  <span>None at all</span>
-                  <span>Central to everything</span>
-                </div>
-              </div>
+              <RadioGroup
+                name="q1_choice"
+                options={Q1_FREQUENCY_OPTIONS}
+                value={form.q1_choice}
+                onChange={(value) => update("q1_choice", value)}
+              />
             </Question>
 
             <Question
               number="Q2"
-              title="Walk us through the last time you used AI for work."
-              helper="What was the task, which tool did you use, and what was the result?"
+              title="Describe ONE specific task where AI is now a regular part of your work."
+              helper="What exactly do you do and what does AI do?"
             >
               <TextArea
-                value={form.q2_text}
-                onChange={(value) => update("q2_text", value)}
-                placeholder="For example: I used ChatGPT to summarize a client brief, then checked and edited the output before..."
+                value={form.q2_task_text}
+                onChange={(value) => update("q2_task_text", value)}
+                placeholder="For example: I prepare the client brief, then use AI to summarize themes and draft the first outline..."
                 required
               />
             </Question>
@@ -577,30 +563,29 @@ export function EmployeeForm() {
           <Section
             id="application"
             number="03"
-            title="Practical Application"
-            description="Help us understand whether AI is creating meaningful leverage in your role."
+            title="Impact & Problem Solving"
+            description="Tell us what changed in your weekly work and what new problem you solved."
           >
             <Question
               number="Q3"
-              title="Describe one routine or repetitive part of your job."
-              helper="Have you used AI to make it faster or easier? If yes, how? If not, why not?"
+              title="Which of the following best describes the impact AI has on your weekly work?"
             >
-              <TextArea
-                value={form.q3_text}
-                onChange={(value) => update("q3_text", value)}
-                placeholder="Describe the routine, your approach, and any time or effort saved..."
-                required
+              <RadioGroup
+                name="q3_impact_choice"
+                options={Q3_IMPACT_OPTIONS}
+                value={form.q3_impact_choice}
+                onChange={(value) => update("q3_impact_choice", value)}
               />
             </Question>
             <Question
               number="Q4"
-              title="If AI could take over one time-wasting part of your job, what would it be?"
-              helper="Tell us whether you have already tried using AI for it."
+              title="Describe a work problem you solved with AI this month that you had not solved with AI before."
+              helper="This must be different from your Q2 answer."
             >
               <TextArea
-                value={form.q4_text}
-                onChange={(value) => update("q4_text", value)}
-                placeholder="The task I would hand over is..."
+                value={form.q4_problem_text}
+                onChange={(value) => update("q4_problem_text", value)}
+                placeholder="The new problem I solved was..."
                 required
               />
             </Question>
@@ -609,48 +594,31 @@ export function EmployeeForm() {
           <Section
             id="exploration"
             number="04"
-            title="Exploration & Curiosity"
-            description="We are interested in how you discover, adapt, and solve problems with AI."
+            title="Workflow & Sharing"
+            description="Help us understand how embedded AI is in your process and whether the learning spread."
           >
             <Question
               number="Q5"
-              title="Have you discovered or tried a new AI tool or feature in the last month?"
+              title="Where does AI currently sit in your workflow?"
             >
               <RadioGroup
-                name="q5_yesno"
-                options={["Yes", "No"]}
-                value={form.q5_yesno}
-                onChange={(value) => {
-                  update("q5_yesno", value as "Yes" | "No");
-                  if (value === "No") update("q5_detail", "");
-                }}
+                name="q5_workflow_choice"
+                options={Q5_WORKFLOW_OPTIONS}
+                value={form.q5_workflow_choice}
+                onChange={(value) => update("q5_workflow_choice", value)}
               />
-              {form.q5_yesno === "Yes" && (
-                <div className="animate-fade-up mt-4">
-                  <label className="label">
-                    What was it, and was it useful?
-                    <input
-                      className="field"
-                      value={form.q5_detail}
-                      onChange={(event) => update("q5_detail", event.target.value)}
-                      placeholder="Tool or feature name, plus what you learned"
-                      required
-                    />
-                  </label>
-                </div>
-              )}
             </Question>
 
             <Question
               number="Q6"
-              title="If AI could not solve a task the normal way, what would you most likely do?"
+              title="Have you shown or taught an AI approach to a colleague this month?"
+              helper="If yes, explain what you shared. If not, briefly say no."
             >
-              <RadioGroup
-                name="q6_choice"
-                options={Q6_OPTIONS}
-                value={form.q6_choice}
-                onChange={(value) => update("q6_choice", value)}
-                columns={4}
+              <TextArea
+                value={form.q6_teaching_text}
+                onChange={(value) => update("q6_teaching_text", value)}
+                placeholder="I shared..."
+                required
               />
             </Question>
           </Section>
@@ -658,32 +626,69 @@ export function EmployeeForm() {
           <Section
             id="growth"
             number="05"
-            title="Confidence & Growth"
-            description="Reflect on your progress and tell us where better support would help."
+            title="Outcomes & Reflection"
+            description="Capture measurable outcomes, failure handling, and blockers for better support."
           >
             <Question
               number="Q7"
-              title="Compared to three months ago, how has your comfort with AI changed?"
+              title="What measurable outcome improved because of AI this month?"
+              helper="Examples: faster turnaround time, more leads handled, better documentation, fewer errors, faster reporting, better communication, or other. Then describe the improvement."
             >
-              <RadioGroup
-                name="q7_choice"
-                options={Q7_OPTIONS}
-                value={form.q7_choice}
-                onChange={(value) => update("q7_choice", value)}
-                columns={4}
+              <TextArea
+                value={form.q7_outcome_text}
+                onChange={(value) => update("q7_outcome_text", value)}
+                placeholder="The measurable improvement was..."
+                required
               />
             </Question>
 
             <Question
               number="Q8"
-              title="What is one thing about AI tools you find frustrating or confusing?"
-              helper="This is not scored. It helps us understand where training or support may be useful."
+              title="Describe one specific time this month AI gave you a wrong or unusable result."
+              helper="What happened and what did you do?"
             >
               <TextArea
-                value={form.q8_text}
-                onChange={(value) => update("q8_text", value)}
-                placeholder="Share any blocker, concern, or recurring frustration..."
-                minHeight="min-h-28"
+                value={form.q8_wrong_result_text}
+                onChange={(value) => update("q8_wrong_result_text", value)}
+                placeholder="AI gave an unusable result when..."
+                required
+              />
+            </Question>
+
+            <Question
+              number="Q9"
+              title="Compared to last month, how has your use of AI changed?"
+              helper="Informational only. This question is not scored."
+            >
+              <RadioGroup
+                name="q9_change_choice"
+                options={Q9_CHANGE_OPTIONS}
+                value={form.q9_change_choice}
+                onChange={(value) => update("q9_change_choice", value)}
+              />
+              <div className="mt-4">
+                <label className="label">
+                  What changed?
+                  <TextArea
+                    value={form.q9_change_text}
+                    onChange={(value) => update("q9_change_text", value)}
+                    placeholder="Optional context..."
+                    minHeight="min-h-24"
+                  />
+                </label>
+              </div>
+            </Question>
+
+            <Question
+              number="Q10"
+              title="Biggest blocker to using AI more in your role?"
+              helper="Informational only. This question is not scored."
+            >
+              <RadioGroup
+                name="q10_blocker_choice"
+                options={Q10_BLOCKER_OPTIONS}
+                value={form.q10_blocker_choice}
+                onChange={(value) => update("q10_blocker_choice", value)}
               />
             </Question>
           </Section>

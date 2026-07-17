@@ -7,13 +7,33 @@ import { AdminHeader } from "@/components/admin-header";
 import { DEPARTMENT_CONTEXT_NOTES } from "@/lib/constants";
 import type { Score, SubmissionDetail } from "@/lib/types";
 
-const QUESTIONS = [
+type ScoreKey =
+  | "q0_score"
+  | "q1_score"
+  | "q2_score"
+  | "q3_score"
+  | "q4_score"
+  | "q5_score"
+  | "q6_score"
+  | "q7_score";
+
+type ReviewQuestion = {
+  answer: string;
+  score: ScoreKey;
+  short: string;
+  label: string;
+  group: string;
+  number: string;
+};
+
+const LEGACY_QUESTIONS: ReviewQuestion[] = [
   {
     answer: "q0_proof",
     score: "q0_score",
     short: "Work proof",
     label: "AI-assisted work proof or example",
     group: "Evidence",
+    number: "Q0",
   },
   {
     answer: "q1_scale",
@@ -21,6 +41,7 @@ const QUESTIONS = [
     short: "Daily usage",
     label: "AI usage in daily work",
     group: "Usage",
+    number: "Q1",
   },
   {
     answer: "q2_text",
@@ -28,6 +49,7 @@ const QUESTIONS = [
     short: "Recent use",
     label: "Most recent work-related AI use",
     group: "Usage",
+    number: "Q2",
   },
   {
     answer: "q3_text",
@@ -35,6 +57,7 @@ const QUESTIONS = [
     short: "Routine work",
     label: "Repetitive work and AI application",
     group: "Application",
+    number: "Q3",
   },
   {
     answer: "q4_text",
@@ -42,6 +65,7 @@ const QUESTIONS = [
     short: "Delegation",
     label: "Work they would hand over to AI",
     group: "Application",
+    number: "Q4",
   },
   {
     answer: "q5_yesno",
@@ -49,6 +73,7 @@ const QUESTIONS = [
     short: "Exploration",
     label: "New AI tool or feature exploration",
     group: "Curiosity",
+    number: "Q5",
   },
   {
     answer: "q6_choice",
@@ -56,6 +81,7 @@ const QUESTIONS = [
     short: "Problem solving",
     label: "Problem-solving behavior",
     group: "Curiosity",
+    number: "Q6",
   },
   {
     answer: "q7_choice",
@@ -63,10 +89,91 @@ const QUESTIONS = [
     short: "Growth",
     label: "Confidence and growth",
     group: "Growth",
+    number: "Q7",
+  },
+];
+
+const MONTH_2_QUESTIONS: ReviewQuestion[] = [
+  {
+    answer: "q1_choice",
+    score: "q0_score",
+    short: "Frequency",
+    label: "AI use frequency in the last 30 days",
+    group: "Usage",
+    number: "Q1",
+  },
+  {
+    answer: "q2_task_text",
+    score: "q1_score",
+    short: "Regular task",
+    label: "Specific task where AI is now regular",
+    group: "Usage",
+    number: "Q2",
+  },
+  {
+    answer: "q3_impact_choice",
+    score: "q2_score",
+    short: "Impact",
+    label: "Weekly work impact",
+    group: "Impact",
+    number: "Q3",
+  },
+  {
+    answer: "q4_problem_text",
+    score: "q3_score",
+    short: "New problem",
+    label: "New work problem solved with AI this month",
+    group: "Problem solving",
+    number: "Q4",
+  },
+  {
+    answer: "q5_workflow_choice",
+    score: "q4_score",
+    short: "Workflow",
+    label: "Current place of AI in workflow",
+    group: "Workflow",
+    number: "Q5",
+  },
+  {
+    answer: "q6_teaching_text",
+    score: "q5_score",
+    short: "Teaching",
+    label: "AI approach shown or taught to a colleague",
+    group: "Sharing",
+    number: "Q6",
+  },
+  {
+    answer: "q7_outcome_text",
+    score: "q6_score",
+    short: "Outcome",
+    label: "Measurable outcome improved by AI",
+    group: "Outcome",
+    number: "Q7",
+  },
+  {
+    answer: "q8_wrong_result_text",
+    score: "q7_score",
+    short: "Wrong result",
+    label: "Wrong or unusable AI result and response",
+    group: "Judgment",
+    number: "Q8",
+  },
+];
+
+const MONTH_2_INFO_QUESTIONS = [
+  {
+    answer: "q9_change_choice",
+    label: "Compared to last month, how has AI use changed?",
+    detail: "q9_change_text",
+    number: "Q9",
+  },
+  {
+    answer: "q10_blocker_choice",
+    label: "Biggest blocker to using AI more in their role",
+    number: "Q10",
   },
 ] as const;
 
-type ScoreKey = (typeof QUESTIONS)[number]["score"];
 type ScoreState = Record<ScoreKey, string>;
 
 const blankScores: ScoreState = {
@@ -93,6 +200,25 @@ function answerText(submission: SubmissionDetail, answer: string) {
       : "No";
   }
   return String(submission[answer as keyof SubmissionDetail] ?? "No response provided.");
+}
+
+function isMonth2Submission(submission: SubmissionDetail) {
+  return Boolean(
+    submission.q1_choice ||
+      submission.q2_task_text ||
+      submission.q3_impact_choice ||
+      submission.q4_problem_text,
+  );
+}
+
+function infoAnswerText(
+  submission: SubmissionDetail,
+  answer: (typeof MONTH_2_INFO_QUESTIONS)[number]["answer"],
+  detail?: "q9_change_text",
+) {
+  const primary = submission[answer] || "No response provided.";
+  if (!detail) return primary;
+  return submission[detail] ? `${primary}\n\n${submission[detail]}` : primary;
 }
 
 function getScoreRecord(value: Score | Score[] | null) {
@@ -221,6 +347,9 @@ export function ReviewForm() {
     const raw = values.reduce((sum, value) => sum + (Number(value) || 0), 0);
     return { completed, raw };
   }, [scores]);
+
+  const month2 = submission ? isMonth2Submission(submission) : false;
+  const questions = month2 ? MONTH_2_QUESTIONS : LEGACY_QUESTIONS;
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -368,7 +497,40 @@ export function ReviewForm() {
                     </h2>
                   </div>
                   <div className="space-y-3">
-                    {QUESTIONS.map((question, index) => (
+                    {month2 && (
+                      <article className="surface-card scroll-mt-24 p-5 sm:p-6">
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-[11px] font-bold text-zinc-400">
+                            Q0
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+                              Evidence
+                            </p>
+                            <h3 className="mt-1 text-sm font-semibold leading-6 text-zinc-200">
+                              AI Work Evidence
+                            </h3>
+                          </div>
+                        </div>
+                        <div className="mt-5 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
+                          <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
+                            {answerText(submission, "q0_proof")}
+                          </p>
+                          {submission.q0_file_url && (
+                            <a
+                              className="mt-3 inline-flex text-sm font-medium text-indigo-300 transition hover:text-indigo-200"
+                              href={submission.q0_file_url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Open uploaded proof
+                            </a>
+                          )}
+                        </div>
+                      </article>
+                    )}
+
+                    {questions.map((question, index) => (
                       <article
                         id={`response-${index}`}
                         key={question.score}
@@ -376,7 +538,7 @@ export function ReviewForm() {
                       >
                         <div className="flex items-start gap-3">
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-[11px] font-bold text-zinc-400">
-                            Q{index}
+                            {question.number}
                           </span>
                           <div className="min-w-0">
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
@@ -405,24 +567,51 @@ export function ReviewForm() {
                       </article>
                     ))}
 
-                    <article className="surface-card p-5 sm:p-6">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-500">
-                          Q8
-                        </span>
-                        <span className="rounded-full border border-zinc-700 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-                          Training needs only · Not scored
-                        </span>
-                      </div>
-                      <h3 className="mt-4 text-sm font-semibold text-zinc-200">
-                        Frustrations or confusion
-                      </h3>
-                      <div className="mt-4 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
-                        <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
-                          {submission.q8_text || "No response provided."}
-                        </p>
-                      </div>
-                    </article>
+                    {month2 ? (
+                      MONTH_2_INFO_QUESTIONS.map((question) => (
+                        <article key={question.number} className="surface-card p-5 sm:p-6">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-500">
+                              {question.number}
+                            </span>
+                            <span className="rounded-full border border-zinc-700 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                              Informational only · Not scored
+                            </span>
+                          </div>
+                          <h3 className="mt-4 text-sm font-semibold text-zinc-200">
+                            {question.label}
+                          </h3>
+                          <div className="mt-4 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
+                            <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
+                              {infoAnswerText(
+                                submission,
+                                question.answer,
+                                "detail" in question ? question.detail : undefined,
+                              )}
+                            </p>
+                          </div>
+                        </article>
+                      ))
+                    ) : (
+                      <article className="surface-card p-5 sm:p-6">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-md bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-500">
+                            Q8
+                          </span>
+                          <span className="rounded-full border border-zinc-700 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                            Training needs only · Not scored
+                          </span>
+                        </div>
+                        <h3 className="mt-4 text-sm font-semibold text-zinc-200">
+                          Frustrations or confusion
+                        </h3>
+                        <div className="mt-4 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
+                          <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
+                            {submission.q8_text || "No response provided."}
+                          </p>
+                        </div>
+                      </article>
+                    )}
                   </div>
                 </div>
               </div>
@@ -459,10 +648,14 @@ export function ReviewForm() {
                   </div>
 
                   <div className="max-h-none space-y-2.5 p-4 xl:max-h-[calc(100vh-370px)] xl:overflow-y-auto">
-                    {QUESTIONS.map((question, index) => (
+                    {questions.map((question, index) => (
                       <ScoreControl
                         key={question.score}
-                        label={`Q${index} · ${question.short}`}
+                        label={
+                          month2
+                            ? `Score ${index + 1} · ${question.number} · ${question.short}`
+                            : `${question.number} · ${question.short}`
+                        }
                         value={scores[question.score]}
                         onChange={(value) =>
                           setScores((current) => ({
