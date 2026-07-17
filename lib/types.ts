@@ -6,6 +6,7 @@ export type Submission = {
   role: string;
   month_year: string;
   q0_proof: string | null;
+  q0_file_url: string | null;
   q1_scale: number;
   q2_text: string;
   q3_text: string;
@@ -44,8 +45,7 @@ export type Ranking = Pick<
   "id" | "employee_id" | "name" | "department" | "role"
 > & {
   raw_score: number;
-  aam: number;
-  normalized_score: number;
+  final_score: number;
   rank: number;
   flagged: boolean;
 };

@@ -263,6 +263,7 @@ function RadioGroup({
 
 export function EmployeeForm() {
   const [form, setForm] = useState(initialState);
+  const [q0File, setQ0File] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -294,10 +295,15 @@ export function EmployeeForm() {
     setError("");
 
     try {
+      const formData = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        formData.append(key, String(value));
+      });
+      if (q0File) formData.append("q0_file", q0File);
+
       const response = await fetch("/api/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: formData,
       });
       const data = await response.json();
 
@@ -483,14 +489,32 @@ export function EmployeeForm() {
             <Question
               number="Q0"
               title="Share one piece of AI-assisted work from this month."
-              helper="Optional: paste a link or briefly describe a report, email, document, or other output."
+              helper="Optional: paste a link or upload a PNG, JPG, JPEG, or PDF proof file."
             >
-              <input
-                className="field"
-                value={form.q0_proof}
-                onChange={(event) => update("q0_proof", event.target.value)}
-                placeholder="Paste a link or add a short description"
-              />
+              <div className="space-y-4">
+                <label className="label">
+                  Link
+                  <input
+                    className="field"
+                    type="url"
+                    value={form.q0_proof}
+                    onChange={(event) => update("q0_proof", event.target.value)}
+                    placeholder="https://example.com/your-ai-assisted-work"
+                  />
+                </label>
+                <label className="label">
+                  Proof file
+                  <span className="helper">PNG, JPG, JPEG, or PDF up to 10 MB</span>
+                  <input
+                    className="field file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-xs file:font-medium file:text-zinc-200 hover:file:bg-zinc-700"
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf"
+                    onChange={(event) =>
+                      setQ0File(event.target.files?.item(0) ?? null)
+                    }
+                  />
+                </label>
+              </div>
             </Question>
 
             <Question

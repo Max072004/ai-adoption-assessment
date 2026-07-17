@@ -17,6 +17,7 @@ export const submissionSchema = z
     department: z.enum(DEPARTMENTS as [string, ...string[]]),
     role: z.string().trim().min(1).max(200),
     q0_proof: optionalText,
+    q0_file_url: optionalText,
     q1_scale: z.coerce.number().int().min(1).max(10),
     q2_text: requiredText,
     q3_text: requiredText,

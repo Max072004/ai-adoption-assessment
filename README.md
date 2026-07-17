@@ -9,8 +9,8 @@ TypeScript, Tailwind CSS, and Supabase Postgres.
 - One submission per employee per calendar month
 - Signed, HTTP-only admin session cookie
 - Protected admin submission and review workflow
-- Department-specific AAM normalization
-- Monthly rankings with bottom-five flags
+- Q0 link and proof-file uploads through Supabase Storage
+- Monthly rankings with final-score flags
 - CSV export
 - Supabase constraints and Row Level Security
 
@@ -28,12 +28,12 @@ npm install
 
 1. Create a free project at [Supabase](https://supabase.com).
 2. Open the project's SQL Editor.
-3. Run the full contents of
-   `supabase/migrations/001_initial_schema.sql`.
+3. Run the full contents of each file in `supabase/migrations/` in filename order.
 
-The migration creates both tables, database constraints, indexes, and RLS policies.
-The public `anon` role can only insert pending submissions. Admin APIs use the
-service role after validating the signed admin cookie.
+The migrations create the tables, storage bucket, database constraints, indexes,
+and RLS policies. The public `anon` role can insert pending submissions and upload
+proof files to the `proofs` bucket. Admin APIs use the service role after
+validating the signed admin cookie.
 
 ### 3. Configure environment variables
 
@@ -99,11 +99,12 @@ Admins enter eight integer scores from 1 to 10. The server calculates:
 
 ```text
 raw_score = q0 + q1 + q2 + q3 + q4 + q5 + q6 + q7
-normalized_score = raw_score / department_aam
+final_score = raw_score
 ```
 
-The normalized score is rounded to one decimal place. Unknown departments use an
-AAM of `0.75`, though the public form only permits configured departments.
+Employees are flagged only when the final score is below 50. The database keeps
+the AAM column for future use, but AAM is not used in score calculations,
+leaderboards, or CSV exports.
 
 ## Useful commands
 

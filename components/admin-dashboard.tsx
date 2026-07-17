@@ -218,9 +218,7 @@ export function AdminDashboard() {
       "Name",
       "Department",
       "Role",
-      "Raw Score",
-      "AAM",
-      "Normalized Score",
+      "Final Score",
       "Flagged",
     ];
     const rows = rankings.map((row) => [
@@ -229,9 +227,7 @@ export function AdminDashboard() {
       row.name,
       row.department,
       row.role,
-      row.raw_score,
-      row.aam,
-      row.normalized_score,
+      row.final_score,
       row.flagged ? "Yes" : "No",
     ]);
     const csv = [headers, ...rows]
@@ -548,7 +544,7 @@ export function AdminDashboard() {
               <div>
                 <h2 className="text-lg font-semibold text-white">Monthly leaderboard</h2>
                 <p className="mt-1 text-xs text-zinc-500">
-                  Ranked by department-adjusted normalized score.
+                  Ranked by final score.
                 </p>
               </div>
               <button
@@ -577,9 +573,9 @@ export function AdminDashboard() {
                     <th className="w-[25%] px-5 py-3.5 font-medium">Employee</th>
                     <th className="w-[19%] px-5 py-3.5 font-medium">Department</th>
                     <th className="w-[18%] px-5 py-3.5 font-medium">Role</th>
-                    <th className="w-[11%] px-5 py-3.5 font-medium">Raw</th>
-                    <th className="w-[8%] px-5 py-3.5 font-medium">AAM</th>
-                    <th className="w-[10%] px-5 py-3.5 text-right font-medium">Score</th>
+                    <th className="w-[21%] px-5 py-3.5 text-right font-medium">
+                      Final Score
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/70">
@@ -616,11 +612,9 @@ export function AdminDashboard() {
                           {displayDepartment(row.department)}
                         </td>
                         <td className="truncate px-5 py-4">{row.role}</td>
-                        <td className="px-5 py-4 tabular-nums">{row.raw_score} / 80</td>
-                        <td className="px-5 py-4 tabular-nums">{row.aam}</td>
                         <td className="px-5 py-4 text-right">
                           <div className="font-semibold tabular-nums text-white">
-                            {row.normalized_score.toFixed(1)}
+                            {row.final_score} / 80
                           </div>
                           {row.flagged && (
                             <span className="mt-1 inline-flex rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-300">
@@ -681,16 +675,15 @@ export function AdminDashboard() {
                           </div>
                           <div className="text-right">
                             <p className="text-xl font-semibold tabular-nums text-white">
-                              {row.normalized_score.toFixed(1)}
+                              {row.final_score}
                             </p>
                             <p className="text-[10px] uppercase tracking-wider text-zinc-600">
-                              Normalized
+                              Final Score
                             </p>
                           </div>
                         </div>
                         <div className="mt-4 flex items-center justify-between border-t border-zinc-800 pt-3 text-xs text-zinc-500">
-                          <span>Raw: {row.raw_score} / 80</span>
-                          <span>AAM: {row.aam}</span>
+                          <span>Final Score: {row.final_score} / 80</span>
                           {row.flagged && (
                             <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-red-300">
                               Flagged

@@ -13,13 +13,9 @@ type RankingRow = {
   scores:
     | {
         raw_score: number | string | null;
-        aam: number | string;
-        normalized_score: number | string | null;
       }
     | {
         raw_score: number | string | null;
-        aam: number | string;
-        normalized_score: number | string | null;
       }[]
     | null;
 };
@@ -40,7 +36,7 @@ export async function GET(request: Request) {
         supabase
           .from("submissions")
           .select(
-            "id, employee_id, name, department, role, scores!inner(raw_score, aam, normalized_score)",
+            "id, employee_id, name, department, role, scores!inner(raw_score)",
           )
           .eq("month_year", month)
           .eq("status", "reviewed"),
@@ -64,17 +60,15 @@ export async function GET(request: Request) {
           department: row.department,
           role: row.role,
           raw_score: Number(score?.raw_score ?? 0),
-          aam: Number(score?.aam ?? 0),
-          normalized_score: Number(score?.normalized_score ?? 0),
+          final_score: Number(score?.raw_score ?? 0),
         };
       })
-      .sort((left, right) => right.normalized_score - left.normalized_score);
+      .sort((left, right) => right.final_score - left.final_score);
 
-    const flagStart = Math.max(0, ranked.length - 5);
     const rankings: Ranking[] = ranked.map((row, index) => ({
       ...row,
       rank: index + 1,
-      flagged: index >= flagStart,
+      flagged: row.final_score < 50,
     }));
     const months = Array.from(
       new Set((monthRows ?? []).map((row) => row.month_year as string)),

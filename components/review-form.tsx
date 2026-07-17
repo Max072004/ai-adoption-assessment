@@ -81,7 +81,11 @@ const blankScores: ScoreState = {
 };
 
 function answerText(submission: SubmissionDetail, answer: string) {
-  if (answer === "q0_proof") return submission.q0_proof || "No response provided.";
+  if (answer === "q0_proof") {
+    if (submission.q0_proof) return submission.q0_proof;
+    if (submission.q0_file_url) return "Uploaded proof file provided.";
+    return "No response provided.";
+  }
   if (answer === "q1_scale") return `${submission.q1_scale} / 10`;
   if (answer === "q5_yesno") {
     return submission.q5_yesno === "Yes"
@@ -317,7 +321,7 @@ export function ReviewForm() {
                   </div>
                   <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 px-4 py-3">
                     <p className="text-[10px] uppercase tracking-wider text-zinc-600">
-                      Score range
+                      Final score range
                     </p>
                     <p className="mt-1 text-sm font-semibold text-zinc-200">8-80 raw</p>
                   </div>
@@ -387,6 +391,16 @@ export function ReviewForm() {
                           <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
                             {answerText(submission, question.answer)}
                           </p>
+                          {question.answer === "q0_proof" && submission.q0_file_url && (
+                            <a
+                              className="mt-3 inline-flex text-sm font-medium text-indigo-300 transition hover:text-indigo-200"
+                              href={submission.q0_file_url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Open uploaded proof
+                            </a>
+                          )}
                         </div>
                       </article>
                     ))}
@@ -420,7 +434,7 @@ export function ReviewForm() {
                       <div>
                         <p className="eyebrow">Scoring panel</p>
                         <h2 className="mt-2 text-lg font-semibold text-white">
-                          Assessment score
+                          Final score
                         </h2>
                       </div>
                       <div className="text-right">

@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const rawScore = scoreKeys.reduce((sum, key) => sum + payload.data[key], 0);
     const aam =
       DEPARTMENT_AAM[submission.department as keyof typeof DEPARTMENT_AAM] ?? 0.75;
-    const normalizedScore = Math.round((rawScore / aam) * 10) / 10;
+    const finalScore = rawScore;
     const now = new Date().toISOString();
 
     const { error: scoreError } = await supabase.from("scores").upsert(
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
         ...Object.fromEntries(scoreKeys.map((key) => [key, payload.data[key]])),
         raw_score: rawScore,
         aam,
-        normalized_score: normalizedScore,
+        normalized_score: finalScore,
         updated_at: now,
       },
       { onConflict: "submission_id" },
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       success: true,
       raw_score: rawScore,
       aam,
-      normalized_score: normalizedScore,
+      normalized_score: finalScore,
     });
   } catch (error) {
     console.error("Save score error:", error);
