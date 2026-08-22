@@ -9,6 +9,7 @@ export const DEPARTMENT_AAM = {
   Procurement: 0.75,
   Operations: 0.65,
   "Engineering / Civil / Site": 0.65,
+  WiseTribes: 1.0,
 } as const;
 
 export const DEPARTMENTS = Object.keys(DEPARTMENT_AAM);
@@ -33,6 +34,8 @@ export const DEPARTMENT_CONTEXT_NOTES: Record<string, string> = {
     "Deep AI tool usage, building with AI, and experimentation is the full expectation.",
   Procurement:
     "AI use in vendor comparison, documentation, and planning is most relevant.",
+  WiseTribes:
+    "AI use in community building, content, operations, member communication, and process improvement is most relevant.",
 };
 
 export const Q6_OPTIONS = [
@@ -88,6 +91,47 @@ export const Q10_BLOCKER_OPTIONS = [
   "Privacy concerns",
   "Don't know where to start",
   "No real blocker",
+] as const;
+
+export const Q4_INTEGRATION_OPTIONS = ["Yes", "No"] as const;
+
+export const Q6_SKILL_OPTIONS = [
+  "Writing better prompts/instructions",
+  "Research & analysis",
+  "Data/spreadsheet work",
+  "Content creation",
+  "Coding/technical work",
+  "Automation/workflows",
+  "Evaluating AI outputs",
+  "Using advanced AI features",
+  "Other",
+] as const;
+
+export const Q7_SHARING_OPTIONS = ["Yes", "No"] as const;
+
+export const Q9_CHALLENGE_OPTIONS = [
+  "Don't know which tool to use",
+  "Don't know how to use it effectively",
+  "Lack of training",
+  "Lack of time to experiment",
+  "Data/privacy concerns",
+  "AI doesn't fit my tasks",
+  "Access/tool limitations",
+  "Nothing currently",
+  "Other",
+] as const;
+
+export const Q10_SUPPORT_OPTIONS = [
+  "Practical training",
+  "Role-specific AI examples",
+  "Prompt/templates library",
+  "Access to better AI tools",
+  "Automation support",
+  "More time to experiment",
+  "Clear company guidelines",
+  "One-to-one support",
+  "Nothing currently",
+  "Other",
 ] as const;
 
 export const SESSION_COOKIE_NAME = "ai_adoption_admin_session";

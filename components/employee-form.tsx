@@ -2,11 +2,12 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import {
-  Q10_BLOCKER_OPTIONS,
-  Q1_FREQUENCY_OPTIONS,
-  Q3_IMPACT_OPTIONS,
-  Q5_WORKFLOW_OPTIONS,
-  Q9_CHANGE_OPTIONS,
+  DEPARTMENTS,
+  Q10_SUPPORT_OPTIONS,
+  Q4_INTEGRATION_OPTIONS,
+  Q6_SKILL_OPTIONS,
+  Q7_SHARING_OPTIONS,
+  Q9_CHALLENGE_OPTIONS,
 } from "@/lib/constants";
 
 type FormState = {
@@ -15,17 +16,21 @@ type FormState = {
   department: string;
   role: string;
   q0_proof: string;
-  q1_choice: string;
-  q2_task_text: string;
-  q3_impact_choice: string;
-  q4_problem_text: string;
-  q5_workflow_choice: string;
-  q6_teaching_text: string;
-  q7_outcome_text: string;
-  q8_wrong_result_text: string;
-  q9_change_choice: string;
-  q9_change_text: string;
-  q10_blocker_choice: string;
+  q1_technology_text: string;
+  q2_use_case_text: string;
+  q3_problem_solving_text: string;
+  q4_integration_choice: "" | "Yes" | "No";
+  q4_integration_text: string;
+  q5_judgment_text: string;
+  q6_skill_choice: string;
+  q6_skill_example_text: string;
+  q7_sharing_choice: "" | "Yes" | "No";
+  q7_sharing_text: string;
+  q8_future_opportunity_text: string;
+  q9_challenge_choice: string;
+  q9_challenge_text: string;
+  q10_support_choice: string;
+  q10_support_text: string;
 };
 
 const initialState: FormState = {
@@ -34,17 +39,21 @@ const initialState: FormState = {
   department: "",
   role: "",
   q0_proof: "",
-  q1_choice: "",
-  q2_task_text: "",
-  q3_impact_choice: "",
-  q4_problem_text: "",
-  q5_workflow_choice: "",
-  q6_teaching_text: "",
-  q7_outcome_text: "",
-  q8_wrong_result_text: "",
-  q9_change_choice: "",
-  q9_change_text: "",
-  q10_blocker_choice: "",
+  q1_technology_text: "",
+  q2_use_case_text: "",
+  q3_problem_solving_text: "",
+  q4_integration_choice: "",
+  q4_integration_text: "",
+  q5_judgment_text: "",
+  q6_skill_choice: "",
+  q6_skill_example_text: "",
+  q7_sharing_choice: "",
+  q7_sharing_text: "",
+  q8_future_opportunity_text: "",
+  q9_challenge_choice: "",
+  q9_challenge_text: "",
+  q10_support_choice: "",
+  q10_support_text: "",
 };
 
 const SECTIONS = [
@@ -70,15 +79,10 @@ const SECTIONS = [
   },
 ] as const;
 
-const UI_DEPARTMENTS = [
-  { label: "Marketing", value: "Marketing" },
-  { label: "Sales", value: "Sales" },
-  { label: "HR", value: "HR" },
-  { label: "Accounts", value: "Accounts" },
-  { label: "Admin", value: "Admin" },
-  { label: "Operations", value: "Operations" },
-  { label: "Editor", value: "Editor / Media" },
-] as const;
+const UI_DEPARTMENTS = DEPARTMENTS.map((department) => ({
+  label: department === "Editor / Media" ? "Editor" : department,
+  value: department,
+}));
 
 const MAX_TEXT = 5000;
 
@@ -287,17 +291,26 @@ export function EmployeeForm() {
       [form.employee_id, form.name, form.department, form.role].every(Boolean),
       Boolean(
         (form.q0_proof || q0File) &&
-          form.q1_choice &&
-          form.q2_task_text,
+          form.q1_technology_text &&
+          form.q2_use_case_text,
       ),
-      Boolean(form.q3_impact_choice && form.q4_problem_text),
       Boolean(
-        form.q5_workflow_choice &&
-          form.q6_teaching_text &&
-          form.q7_outcome_text &&
-          form.q8_wrong_result_text,
+        form.q3_problem_solving_text &&
+          form.q4_integration_choice &&
+          (form.q4_integration_choice === "No" || form.q4_integration_text),
       ),
-      Boolean(form.q9_change_choice && form.q10_blocker_choice),
+      Boolean(
+        form.q5_judgment_text &&
+          form.q6_skill_choice &&
+          form.q6_skill_example_text &&
+          form.q7_sharing_choice &&
+          (form.q7_sharing_choice === "No" || form.q7_sharing_text),
+      ),
+      Boolean(
+        form.q8_future_opportunity_text &&
+          form.q9_challenge_choice &&
+          form.q10_support_choice,
+      ),
     ],
     [form, q0File],
   );
@@ -498,13 +511,13 @@ export function EmployeeForm() {
           <Section
             id="usage"
             number="02"
-            title="Usage Snapshot"
-            description="Show evidence and describe how often AI appeared in your actual work."
+            title="Evidence & Learning"
+            description="Share proof of real work and the new AI knowledge you built this month."
           >
             <Question
               number="Q0"
               title="AI Work Evidence"
-              helper="Required: share evidence of AI-assisted work completed this month. Use a link or upload a PNG, JPG, JPEG, or PDF proof file."
+              helper="Required: share one piece of AI-assisted work you completed this month that you are most proud of. Use a link or upload a PNG, JPG, JPEG, or PDF proof file."
             >
               <div className="space-y-4">
                 <label className="label">
@@ -536,25 +549,26 @@ export function EmployeeForm() {
 
             <Question
               number="Q1"
-              title="In the last 30 days, how often did you use AI for actual work tasks?"
+              title="What new AI tool, technology, feature, or technique did you research or learn about this month that is relevant to your work?"
+              helper="Tell us how you used it."
             >
-              <RadioGroup
-                name="q1_choice"
-                options={Q1_FREQUENCY_OPTIONS}
-                value={form.q1_choice}
-                onChange={(value) => update("q1_choice", value)}
+              <TextArea
+                value={form.q1_technology_text}
+                onChange={(value) => update("q1_technology_text", value)}
+                placeholder="This month I learned about..."
+                required
               />
             </Question>
 
             <Question
               number="Q2"
-              title="Describe ONE specific task where AI is now a regular part of your work."
-              helper="What exactly do you do and what does AI do?"
+              title="Show us one task from your actual work where AI has become a useful part of your process."
+              helper="What exactly are you using AI for?"
             >
               <TextArea
-                value={form.q2_task_text}
-                onChange={(value) => update("q2_task_text", value)}
-                placeholder="For example: I prepare the client brief, then use AI to summarize themes and draft the first outline..."
+                value={form.q2_use_case_text}
+                onChange={(value) => update("q2_use_case_text", value)}
+                placeholder="One actual work task where AI is now useful is..."
                 required
               />
             </Question>
@@ -563,133 +577,180 @@ export function EmployeeForm() {
           <Section
             id="application"
             number="03"
-            title="Impact & Problem Solving"
-            description="Tell us what changed in your weekly work and what new problem you solved."
+            title="Problem Solving & Integration"
+            description="Describe deeper AI use: experimentation, unusual problems, and combining AI with other tools."
           >
             <Question
               number="Q3"
-              title="Which of the following best describes the impact AI has on your weekly work?"
+              title="What was one difficult or unusual problem you tried to solve using AI this month?"
+              helper="What approach did you take, and what did you learn from the experience?"
             >
-              <RadioGroup
-                name="q3_impact_choice"
-                options={Q3_IMPACT_OPTIONS}
-                value={form.q3_impact_choice}
-                onChange={(value) => update("q3_impact_choice", value)}
+              <TextArea
+                value={form.q3_problem_solving_text}
+                onChange={(value) => update("q3_problem_solving_text", value)}
+                placeholder="The difficult or unusual problem was..."
+                required
               />
             </Question>
             <Question
               number="Q4"
-              title="Describe a work problem you solved with AI this month that you had not solved with AI before."
-              helper="This must be different from your Q2 answer."
+              title="Did you use AI together with another tool, software, or technology this month?"
+              helper="Examples could include spreadsheets, design tools, CRM, coding tools, automation, data analysis, internal software, or another department-specific tool."
             >
-              <TextArea
-                value={form.q4_problem_text}
-                onChange={(value) => update("q4_problem_text", value)}
-                placeholder="The new problem I solved was..."
-                required
+              <RadioGroup
+                name="q4_integration_choice"
+                options={Q4_INTEGRATION_OPTIONS}
+                value={form.q4_integration_choice}
+                onChange={(value) => {
+                  update("q4_integration_choice", value as "Yes" | "No");
+                  if (value === "No") update("q4_integration_text", "");
+                }}
               />
+              {form.q4_integration_choice === "Yes" && (
+                <div className="animate-fade-up mt-4">
+                  <TextArea
+                    value={form.q4_integration_text}
+                    onChange={(value) => update("q4_integration_text", value)}
+                    placeholder="I combined AI with..."
+                    required
+                    minHeight="min-h-28"
+                  />
+                </div>
+              )}
             </Question>
           </Section>
 
           <Section
             id="exploration"
             number="04"
-            title="Workflow & Sharing"
-            description="Help us understand how embedded AI is in your process and whether the learning spread."
+            title="Judgment & Skills"
+            description="Show how you verify AI output, improve your craft, and share useful AI practice."
           >
             <Question
               number="Q5"
-              title="Where does AI currently sit in your workflow?"
+              title="Describe one situation where you did not fully trust an AI-generated answer and had to verify, correct, or reject it."
+              helper="What did you do?"
             >
-              <RadioGroup
-                name="q5_workflow_choice"
-                options={Q5_WORKFLOW_OPTIONS}
-                value={form.q5_workflow_choice}
-                onChange={(value) => update("q5_workflow_choice", value)}
+              <TextArea
+                value={form.q5_judgment_text}
+                onChange={(value) => update("q5_judgment_text", value)}
+                placeholder="I did not fully trust AI when..."
+                required
               />
             </Question>
 
             <Question
               number="Q6"
-              title="Have you shown or taught an AI approach to a colleague this month?"
-              helper="If yes, explain what you shared. If not, briefly say no."
+              title="Which AI skill have you improved the most this month?"
             >
-              <TextArea
-                value={form.q6_teaching_text}
-                onChange={(value) => update("q6_teaching_text", value)}
-                placeholder="I shared..."
-                required
+              <RadioGroup
+                name="q6_skill_choice"
+                options={Q6_SKILL_OPTIONS}
+                value={form.q6_skill_choice}
+                onChange={(value) => update("q6_skill_choice", value)}
               />
+              <div className="mt-4">
+                <Question title="Give one example of how you used this skill this month.">
+                  <TextArea
+                    value={form.q6_skill_example_text}
+                    onChange={(value) => update("q6_skill_example_text", value)}
+                    placeholder="I used this skill when..."
+                    required
+                    minHeight="min-h-28"
+                  />
+                </Question>
+              </div>
+            </Question>
+
+            <Question
+              number="Q7"
+              title="Did you share an AI tool, prompt, workflow, or technique with someone else this month?"
+            >
+              <RadioGroup
+                name="q7_sharing_choice"
+                options={Q7_SHARING_OPTIONS}
+                value={form.q7_sharing_choice}
+                onChange={(value) => {
+                  update("q7_sharing_choice", value as "Yes" | "No");
+                  if (value === "No") update("q7_sharing_text", "");
+                }}
+              />
+              {form.q7_sharing_choice === "Yes" && (
+                <div className="animate-fade-up mt-4">
+                  <TextArea
+                    value={form.q7_sharing_text}
+                    onChange={(value) => update("q7_sharing_text", value)}
+                    placeholder="I shared..."
+                    required
+                    minHeight="min-h-28"
+                  />
+                </div>
+              )}
             </Question>
           </Section>
 
           <Section
             id="growth"
             number="05"
-            title="Outcomes & Reflection"
-            description="Capture measurable outcomes, failure handling, and blockers for better support."
+            title="Future Opportunities & Support"
+            description="Identify the next opportunity for AI and what support would make adoption easier."
           >
             <Question
-              number="Q7"
-              title="What measurable outcome improved because of AI this month?"
-              helper="Examples: faster turnaround time, more leads handled, better documentation, fewer errors, faster reporting, better communication, or other. Then describe the improvement."
-            >
-              <TextArea
-                value={form.q7_outcome_text}
-                onChange={(value) => update("q7_outcome_text", value)}
-                placeholder="The measurable improvement was..."
-                required
-              />
-            </Question>
-
-            <Question
               number="Q8"
-              title="Describe one specific time this month AI gave you a wrong or unusable result."
-              helper="What happened and what did you do?"
+              title="What is one task in your role that you believe AI could significantly improve, but you haven't figured out how to use AI for yet?"
             >
               <TextArea
-                value={form.q8_wrong_result_text}
-                onChange={(value) => update("q8_wrong_result_text", value)}
-                placeholder="AI gave an unusable result when..."
+                value={form.q8_future_opportunity_text}
+                onChange={(value) => update("q8_future_opportunity_text", value)}
+                placeholder="One future opportunity is..."
                 required
               />
             </Question>
 
             <Question
               number="Q9"
-              title="Compared to last month, how has your use of AI changed?"
+              title="What is currently stopping you from getting more value from AI in your role?"
               helper="Informational only. This question is not scored."
             >
               <RadioGroup
-                name="q9_change_choice"
-                options={Q9_CHANGE_OPTIONS}
-                value={form.q9_change_choice}
-                onChange={(value) => update("q9_change_choice", value)}
+                name="q9_challenge_choice"
+                options={Q9_CHALLENGE_OPTIONS}
+                value={form.q9_challenge_choice}
+                onChange={(value) => update("q9_challenge_choice", value)}
               />
-              <div className="mt-4">
-                <label className="label">
-                  What changed?
+              {form.q9_challenge_choice === "Other" && (
+                <div className="mt-4">
                   <TextArea
-                    value={form.q9_change_text}
-                    onChange={(value) => update("q9_change_text", value)}
+                    value={form.q9_challenge_text}
+                    onChange={(value) => update("q9_challenge_text", value)}
                     placeholder="Optional context..."
                     minHeight="min-h-24"
                   />
-                </label>
-              </div>
+                </div>
+              )}
             </Question>
 
             <Question
               number="Q10"
-              title="Biggest blocker to using AI more in your role?"
+              title="What would help you become better at using AI in your role?"
               helper="Informational only. This question is not scored."
             >
               <RadioGroup
-                name="q10_blocker_choice"
-                options={Q10_BLOCKER_OPTIONS}
-                value={form.q10_blocker_choice}
-                onChange={(value) => update("q10_blocker_choice", value)}
+                name="q10_support_choice"
+                options={Q10_SUPPORT_OPTIONS}
+                value={form.q10_support_choice}
+                onChange={(value) => update("q10_support_choice", value)}
               />
+              {form.q10_support_choice === "Other" && (
+                <div className="mt-4">
+                  <TextArea
+                    value={form.q10_support_text}
+                    onChange={(value) => update("q10_support_text", value)}
+                    placeholder="Optional context..."
+                    minHeight="min-h-24"
+                  />
+                </div>
+              )}
             </Question>
           </Section>
 

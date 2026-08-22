@@ -1,0 +1,16 @@
+alter table public.submissions
+  add column if not exists q1_technology_text text,
+  add column if not exists q2_use_case_text text,
+  add column if not exists q3_problem_solving_text text,
+  add column if not exists q4_integration_choice text,
+  add column if not exists q4_integration_text text,
+  add column if not exists q5_judgment_text text,
+  add column if not exists q6_skill_choice text,
+  add column if not exists q6_skill_example_text text,
+  add column if not exists q7_sharing_choice text,
+  add column if not exists q7_sharing_text text,
+  add column if not exists q8_future_opportunity_text text,
+  add column if not exists q9_challenge_choice text,
+  add column if not exists q9_challenge_text text,
+  add column if not exists q10_support_choice text,
+  add column if not exists q10_support_text text;

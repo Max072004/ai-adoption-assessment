@@ -174,6 +174,88 @@ const MONTH_2_INFO_QUESTIONS = [
   },
 ] as const;
 
+const MONTH_3_QUESTIONS: ReviewQuestion[] = [
+  {
+    answer: "q1_technology_text",
+    score: "q0_score",
+    short: "Learning",
+    label: "Learning / New Technology",
+    group: "Learning",
+    number: "Q1",
+  },
+  {
+    answer: "q2_use_case_text",
+    score: "q1_score",
+    short: "Use case",
+    label: "Practical AI Usage",
+    group: "Application",
+    number: "Q2",
+  },
+  {
+    answer: "q3_problem_solving_text",
+    score: "q2_score",
+    short: "Problem solving",
+    label: "AI Problem Solving",
+    group: "Problem solving",
+    number: "Q3",
+  },
+  {
+    answer: "q4_integration_choice",
+    score: "q3_score",
+    short: "Integration",
+    label: "AI + Other Technology",
+    group: "Integration",
+    number: "Q4",
+  },
+  {
+    answer: "q5_judgment_text",
+    score: "q4_score",
+    short: "Judgment",
+    label: "AI Judgment / Verification",
+    group: "Judgment",
+    number: "Q5",
+  },
+  {
+    answer: "q6_skill_choice",
+    score: "q5_score",
+    short: "Skill",
+    label: "AI Skill Development",
+    group: "Skill development",
+    number: "Q6",
+  },
+  {
+    answer: "q7_sharing_choice",
+    score: "q6_score",
+    short: "Sharing",
+    label: "AI Knowledge Sharing",
+    group: "Sharing",
+    number: "Q7",
+  },
+  {
+    answer: "q8_future_opportunity_text",
+    score: "q7_score",
+    short: "Opportunity",
+    label: "Future AI Opportunity",
+    group: "Opportunity",
+    number: "Q8",
+  },
+];
+
+const MONTH_3_INFO_QUESTIONS = [
+  {
+    answer: "q9_challenge_choice",
+    label: "Current Challenge",
+    detail: "q9_challenge_text",
+    number: "Q9",
+  },
+  {
+    answer: "q10_support_choice",
+    label: "Support Needed",
+    detail: "q10_support_text",
+    number: "Q10",
+  },
+] as const;
+
 type ScoreState = Record<ScoreKey, string>;
 
 const blankScores: ScoreState = {
@@ -199,7 +281,31 @@ function answerText(submission: SubmissionDetail, answer: string) {
       ? `Yes - ${submission.q5_detail || "No detail provided."}`
       : "No";
   }
+  if (answer === "q4_integration_choice") {
+    return submission.q4_integration_choice === "Yes"
+      ? `Yes - ${submission.q4_integration_text || "No detail provided."}`
+      : submission.q4_integration_choice || "No response provided.";
+  }
+  if (answer === "q6_skill_choice") {
+    return submission.q6_skill_example_text
+      ? `${submission.q6_skill_choice}\n\n${submission.q6_skill_example_text}`
+      : submission.q6_skill_choice || "No response provided.";
+  }
+  if (answer === "q7_sharing_choice") {
+    return submission.q7_sharing_choice === "Yes"
+      ? `Yes - ${submission.q7_sharing_text || "No detail provided."}`
+      : submission.q7_sharing_choice || "No response provided.";
+  }
   return String(submission[answer as keyof SubmissionDetail] ?? "No response provided.");
+}
+
+function isMonth3Submission(submission: SubmissionDetail) {
+  return Boolean(
+    submission.q1_technology_text ||
+      submission.q2_use_case_text ||
+      submission.q3_problem_solving_text ||
+      submission.q4_integration_choice,
+  );
 }
 
 function isMonth2Submission(submission: SubmissionDetail) {
@@ -213,8 +319,10 @@ function isMonth2Submission(submission: SubmissionDetail) {
 
 function infoAnswerText(
   submission: SubmissionDetail,
-  answer: (typeof MONTH_2_INFO_QUESTIONS)[number]["answer"],
-  detail?: "q9_change_text",
+  answer:
+    | (typeof MONTH_2_INFO_QUESTIONS)[number]["answer"]
+    | (typeof MONTH_3_INFO_QUESTIONS)[number]["answer"],
+  detail?: "q9_change_text" | "q9_challenge_text" | "q10_support_text",
 ) {
   const primary = submission[answer] || "No response provided.";
   if (!detail) return primary;
@@ -348,8 +456,18 @@ export function ReviewForm() {
     return { completed, raw };
   }, [scores]);
 
-  const month2 = submission ? isMonth2Submission(submission) : false;
-  const questions = month2 ? MONTH_2_QUESTIONS : LEGACY_QUESTIONS;
+  const month3 = submission ? isMonth3Submission(submission) : false;
+  const month2 = submission ? !month3 && isMonth2Submission(submission) : false;
+  const questions = month3
+    ? MONTH_3_QUESTIONS
+    : month2
+      ? MONTH_2_QUESTIONS
+      : LEGACY_QUESTIONS;
+  const infoQuestions = month3
+    ? MONTH_3_INFO_QUESTIONS
+    : month2
+      ? MONTH_2_INFO_QUESTIONS
+      : [];
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -497,7 +615,7 @@ export function ReviewForm() {
                     </h2>
                   </div>
                   <div className="space-y-3">
-                    {month2 && (
+                    {(month2 || month3) && (
                       <article className="surface-card scroll-mt-24 p-5 sm:p-6">
                         <div className="flex items-start gap-3">
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-[11px] font-bold text-zinc-400">
@@ -508,7 +626,7 @@ export function ReviewForm() {
                               Evidence
                             </p>
                             <h3 className="mt-1 text-sm font-semibold leading-6 text-zinc-200">
-                              AI Work Evidence
+                              {month3 ? "AI Work Evidence" : "AI Work Evidence"}
                             </h3>
                           </div>
                         </div>
@@ -567,8 +685,8 @@ export function ReviewForm() {
                       </article>
                     ))}
 
-                    {month2 ? (
-                      MONTH_2_INFO_QUESTIONS.map((question) => (
+                    {month2 || month3 ? (
+                      infoQuestions.map((question) => (
                         <article key={question.number} className="surface-card p-5 sm:p-6">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-md bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-500">
@@ -652,7 +770,7 @@ export function ReviewForm() {
                       <ScoreControl
                         key={question.score}
                         label={
-                          month2
+                          month2 || month3
                             ? `Score ${index + 1} · ${question.number} · ${question.short}`
                             : `${question.number} · ${question.short}`
                         }

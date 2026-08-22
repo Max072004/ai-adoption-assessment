@@ -3,19 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminHeader } from "@/components/admin-header";
+import { DEPARTMENTS } from "@/lib/constants";
 import type { Ranking, Submission } from "@/lib/types";
 
 type Tab = "submissions" | "rankings";
 
-const FILTER_DEPARTMENTS = [
-  { label: "Marketing", value: "Marketing" },
-  { label: "Sales", value: "Sales" },
-  { label: "HR", value: "HR" },
-  { label: "Accounts", value: "Accounts" },
-  { label: "Admin", value: "Admin" },
-  { label: "Operations", value: "Operations" },
-  { label: "Editor", value: "Editor / Media" },
-] as const;
+const FILTER_DEPARTMENTS = DEPARTMENTS.map((department) => ({
+  label: department === "Editor / Media" ? "Editor" : department,
+  value: department,
+}));
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
