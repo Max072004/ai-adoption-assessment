@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
+import {
+  answerColumn,
+  OBJECTIVE_ASSESSMENT_VERSION,
+  OBJECTIVE_QUESTION_IDS,
+} from "@/lib/assessment";
+import { scoreObjectiveAnswers } from "@/lib/assessment-scoring";
 import { createServiceClient } from "@/lib/supabase";
-import { submissionSchema } from "@/lib/validation";
+import { objectiveSubmissionSchema } from "@/lib/validation";
 
+// Q22 evidence reuses the existing proof upload infrastructure (Q0 columns +
+// "proofs" storage bucket) introduced in migration 002.
 const PROOF_BUCKET = "proofs";
 const MAX_PROOF_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_PROOF_TYPES = new Map([
@@ -28,38 +36,44 @@ function getTextField(formData: FormData, key: string) {
   return typeof value === "string" ? value : "";
 }
 
-function getProofFile(formData: FormData) {
-  const value = formData.get("q0_file");
+function getTextList(formData: FormData, key: string) {
+  return formData
+    .getAll(key)
+    .filter((value): value is string => typeof value === "string");
+}
+
+function getEvidenceFile(formData: FormData) {
+  const value = formData.get("q22_evidence_file");
   if (!(value instanceof File) || value.size === 0) return null;
   return value;
+}
+
+function duplicateResponse(monthYear: string) {
+  return NextResponse.json(
+    {
+      error: `You've already submitted your response for ${displayMonth(monthYear)}. Thank you!`,
+    },
+    { status: 409 },
+  );
 }
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const proofFile = getProofFile(formData);
-    const payload = submissionSchema.safeParse({
+    const evidenceFile = getEvidenceFile(formData);
+
+    const payload = objectiveSubmissionSchema.safeParse({
       employee_id: getTextField(formData, "employee_id"),
       name: getTextField(formData, "name"),
       department: getTextField(formData, "department"),
       role: getTextField(formData, "role"),
-      q0_proof: getTextField(formData, "q0_proof"),
-      q0_file_url: proofFile ? "pending-upload" : null,
-      q1_technology_text: getTextField(formData, "q1_technology_text"),
-      q2_use_case_text: getTextField(formData, "q2_use_case_text"),
-      q3_problem_solving_text: getTextField(formData, "q3_problem_solving_text"),
-      q4_integration_choice: getTextField(formData, "q4_integration_choice"),
-      q4_integration_text: getTextField(formData, "q4_integration_text"),
-      q5_judgment_text: getTextField(formData, "q5_judgment_text"),
-      q6_skill_choice: getTextField(formData, "q6_skill_choice"),
-      q6_skill_example_text: getTextField(formData, "q6_skill_example_text"),
-      q7_sharing_choice: getTextField(formData, "q7_sharing_choice"),
-      q7_sharing_text: getTextField(formData, "q7_sharing_text"),
-      q8_future_opportunity_text: getTextField(formData, "q8_future_opportunity_text"),
-      q9_challenge_choice: getTextField(formData, "q9_challenge_choice"),
-      q9_challenge_text: getTextField(formData, "q9_challenge_text"),
-      q10_support_choice: getTextField(formData, "q10_support_choice"),
-      q10_support_text: getTextField(formData, "q10_support_text"),
+      answers: Object.fromEntries(
+        OBJECTIVE_QUESTION_IDS.map((id) => [id, getTextField(formData, id)]),
+      ),
+      q21_tools: getTextList(formData, "q21_tools"),
+      q21_other_text: getTextField(formData, "q21_other_text"),
+      q22_evidence_link: getTextField(formData, "q22_evidence_link"),
+      q22_has_file: Boolean(evidenceFile),
     });
     if (!payload.success) {
       return NextResponse.json(
@@ -71,55 +85,46 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    if (proofFile) {
-      if (!ALLOWED_PROOF_TYPES.has(proofFile.type)) {
+
+    if (evidenceFile) {
+      if (!ALLOWED_PROOF_TYPES.has(evidenceFile.type)) {
         return NextResponse.json(
-          { error: "Please upload a PNG, JPG, JPEG, or PDF file for Q0." },
+          { error: "Please upload a PNG, JPG, JPEG, or PDF file for Q22." },
           { status: 400 },
         );
       }
-      if (proofFile.size > MAX_PROOF_FILE_SIZE) {
+      if (evidenceFile.size > MAX_PROOF_FILE_SIZE) {
         return NextResponse.json(
-          { error: "Please upload a Q0 proof file smaller than 10 MB." },
+          { error: "Please upload a Q22 evidence file smaller than 10 MB." },
           { status: 400 },
         );
       }
     }
+
+    const { data } = payload;
+    // Drop the "Other" text when "Other" was not selected.
+    const q21OtherText = data.q21_tools.includes("Other") ? data.q21_other_text : null;
 
     const supabase = createServiceClient();
     const monthYear = currentMonthYear();
     const { data: existing, error: lookupError } = await supabase
       .from("submissions")
       .select("id")
-      .eq("employee_id", payload.data.employee_id)
+      .eq("employee_id", data.employee_id)
       .eq("month_year", monthYear)
       .maybeSingle();
 
     if (lookupError) throw lookupError;
+    if (existing) return duplicateResponse(monthYear);
 
-    if (existing) {
-      return NextResponse.json(
-        {
-          error: `You've already submitted your response for ${displayMonth(monthYear)}. Thank you!`,
-        },
-        { status: 409 },
-      );
-    }
-
-    let q0FileUrl: string | null = null;
-    if (proofFile) {
-      const extension = ALLOWED_PROOF_TYPES.get(proofFile.type);
-      if (!extension) {
-        return NextResponse.json(
-          { error: "Please upload a PNG, JPG, JPEG, or PDF file for Q0." },
-          { status: 400 },
-        );
-      }
-      const path = `${monthYear}/${payload.data.employee_id}/${crypto.randomUUID()}.${extension}`;
+    let evidenceFileUrl: string | null = null;
+    if (evidenceFile) {
+      const extension = ALLOWED_PROOF_TYPES.get(evidenceFile.type)!;
+      const path = `${monthYear}/${data.employee_id}/${crypto.randomUUID()}.${extension}`;
       const { error: uploadError } = await supabase.storage
         .from(PROOF_BUCKET)
-        .upload(path, proofFile, {
-          contentType: proofFile.type,
+        .upload(path, evidenceFile, {
+          contentType: evidenceFile.type,
           upsert: false,
         });
 
@@ -128,37 +133,38 @@ export async function POST(request: Request) {
       const { data: publicUrl } = supabase.storage
         .from(PROOF_BUCKET)
         .getPublicUrl(path);
-      q0FileUrl = publicUrl.publicUrl;
+      evidenceFileUrl = publicUrl.publicUrl;
     }
 
+    // Objective score is computed here against the server-side answer key.
+    const objective = scoreObjectiveAnswers(data.answers);
+    const answerColumns = Object.fromEntries(
+      OBJECTIVE_QUESTION_IDS.map((id) => [answerColumn(id), data.answers[id]]),
+    );
+
     const { error: insertError } = await supabase.from("submissions").insert({
-      ...payload.data,
-      q0_file_url: q0FileUrl,
-      q1_scale: 5,
-      q2_text: payload.data.q2_use_case_text,
-      q3_text: payload.data.q3_problem_solving_text,
-      q4_text: payload.data.q4_integration_text ?? payload.data.q4_integration_choice,
-      q5_yesno: "Yes",
-      q5_detail: payload.data.q5_judgment_text,
-      q6_choice: "Try rephrasing/asking differently",
-      q7_choice: "Same as before",
-      q8_text: payload.data.q8_future_opportunity_text,
+      employee_id: data.employee_id,
+      name: data.name,
+      department: data.department,
+      role: data.role,
       month_year: monthYear,
+      assessment_version: OBJECTIVE_ASSESSMENT_VERSION,
+      ...answerColumns,
+      objective_score: objective.score,
+      q21_tools: data.q21_tools,
+      q21_other_text: q21OtherText,
+      q0_proof: data.q22_evidence_link,
+      q0_file_url: evidenceFileUrl,
       status: "pending",
     });
 
     if (insertError) {
-      if (insertError.code === "23505") {
-        return NextResponse.json(
-          {
-            error: `You've already submitted your response for ${displayMonth(monthYear)}. Thank you!`,
-          },
-          { status: 409 },
-        );
-      }
+      if (insertError.code === "23505") return duplicateResponse(monthYear);
       throw insertError;
     }
 
+    // Employees only ever receive a confirmation. Never return scores,
+    // correctness, or the answer key here.
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {
     console.error("Submission error:", error);

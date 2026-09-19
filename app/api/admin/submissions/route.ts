@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api";
-import { DEPARTMENTS } from "@/lib/constants";
+import { ALL_DEPARTMENTS } from "@/lib/constants";
 import { createServiceClient } from "@/lib/supabase";
 import { monthSchema } from "@/lib/validation";
 
@@ -16,7 +16,8 @@ export async function GET(request: Request) {
     if (!month || !monthSchema.safeParse(month).success) {
       return NextResponse.json({ error: "A valid month is required." }, { status: 400 });
     }
-    if (department && !DEPARTMENTS.includes(department)) {
+    // Historical Procurement / Engineering rows must remain filterable.
+    if (department && !ALL_DEPARTMENTS.includes(department)) {
       return NextResponse.json({ error: "Invalid department." }, { status: 400 });
     }
 
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from("submissions")
       .select(
-        "id, employee_id, name, department, role, month_year, status, created_at",
+        "id, employee_id, name, department, role, month_year, status, created_at, assessment_version",
       )
       .eq("month_year", month)
       .order("created_at", { ascending: false });

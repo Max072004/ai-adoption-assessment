@@ -1,14 +1,15 @@
 import { z } from "zod";
 import {
-  DEPARTMENTS,
-  Q10_SUPPORT_OPTIONS,
-  Q4_INTEGRATION_OPTIONS,
-  Q6_SKILL_OPTIONS,
-  Q7_SHARING_OPTIONS,
-  Q9_CHALLENGE_OPTIONS,
-} from "@/lib/constants";
+  ANSWER_LETTERS,
+  MANUAL_SCORE_MAX,
+  MANUAL_SCORE_MIN,
+  OBJECTIVE_QUESTION_IDS,
+  Q21_OTHER_OPTION,
+  Q21_TOOL_OPTIONS,
+  type ObjectiveQuestionId,
+} from "@/lib/assessment";
+import { ACTIVE_DEPARTMENTS } from "@/lib/constants";
 
-const requiredText = z.string().trim().min(1).max(5000);
 const optionalText = z
   .string()
   .trim()
@@ -17,54 +18,66 @@ const optionalText = z
   .nullable()
   .transform((value) => value || null);
 
-export const submissionSchema = z
+const answerLetter = z.enum(ANSWER_LETTERS, {
+  errorMap: () => ({ message: "Please answer every question from Q1 to Q20." }),
+});
+
+// Q1-Q20: every question is required and accepts exactly one letter.
+const objectiveAnswersShape = Object.fromEntries(
+  OBJECTIVE_QUESTION_IDS.map((id) => [id, answerLetter]),
+) as Record<ObjectiveQuestionId, typeof answerLetter>;
+
+export const objectiveSubmissionSchema = z
   .object({
     employee_id: z.string().trim().min(1).max(100),
     name: z.string().trim().min(1).max(200),
-    department: z.enum(DEPARTMENTS as [string, ...string[]]),
+    department: z.enum(ACTIVE_DEPARTMENTS as [string, ...string[]], {
+      errorMap: () => ({ message: "Please select a valid department." }),
+    }),
     role: z.string().trim().min(1).max(200),
-    q0_proof: optionalText,
-    q0_file_url: optionalText,
-    q1_technology_text: requiredText,
-    q2_use_case_text: requiredText,
-    q3_problem_solving_text: requiredText,
-    q4_integration_choice: z.enum(Q4_INTEGRATION_OPTIONS),
-    q4_integration_text: optionalText,
-    q5_judgment_text: requiredText,
-    q6_skill_choice: z.enum(Q6_SKILL_OPTIONS),
-    q6_skill_example_text: requiredText,
-    q7_sharing_choice: z.enum(Q7_SHARING_OPTIONS),
-    q7_sharing_text: optionalText,
-    q8_future_opportunity_text: requiredText,
-    q9_challenge_choice: z.enum(Q9_CHALLENGE_OPTIONS),
-    q9_challenge_text: optionalText,
-    q10_support_choice: z.enum(Q10_SUPPORT_OPTIONS),
-    q10_support_text: optionalText,
+    answers: z.object(objectiveAnswersShape),
+    q21_tools: z
+      .array(
+        z.enum(Q21_TOOL_OPTIONS, {
+          errorMap: () => ({ message: "Please choose AI tools from the list." }),
+        }),
+      )
+      .min(1, "Please select at least one AI tool for Q21.")
+      .transform((tools) => Array.from(new Set(tools))),
+    q21_other_text: optionalText,
+    q22_evidence_link: z
+      .string()
+      .trim()
+      .max(5000)
+      .optional()
+      .nullable()
+      .transform((value) => value || null)
+      .refine(
+        (value) => value === null || /^https?:\/\/\S+$/i.test(value),
+        "Please enter a valid link (starting with http:// or https://) for Q22.",
+      ),
+    q22_has_file: z.boolean(),
   })
   .superRefine((data, ctx) => {
-    if (!data.q0_proof && !data.q0_file_url) {
+    if (data.q21_tools.includes(Q21_OTHER_OPTION) && !data.q21_other_text) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["q0_proof"],
-        message: "Please provide a Q0 proof link or upload a proof file.",
+        path: ["q21_other_text"],
+        message: "Please tell us which other AI tool(s) you used or explored.",
       });
     }
-    if (data.q4_integration_choice === "Yes" && !data.q4_integration_text) {
+    if (!data.q22_evidence_link && !data.q22_has_file) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["q4_integration_text"],
-        message: "Please explain what you combined and what you achieved.",
-      });
-    }
-    if (data.q7_sharing_choice === "Yes" && !data.q7_sharing_text) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["q7_sharing_text"],
-        message: "Please explain what you shared and how it could help them.",
+        path: ["q22_evidence_link"],
+        message: "Please share a link or upload a file as evidence for Q22.",
       });
     }
   });
 
+export type ObjectiveSubmissionInput = z.infer<typeof objectiveSubmissionSchema>;
+
+// Legacy manual scoring (Month 1/2/3): eight integer scores from 1 to 10.
 const scoreValue = z.coerce.number().int().min(1).max(10);
 
 export const scoreSchema = z.object({
@@ -77,6 +90,20 @@ export const scoreSchema = z.object({
   q5_score: scoreValue,
   q6_score: scoreValue,
   q7_score: scoreValue,
+  admin_note: optionalText,
+});
+
+// Objective assessment manual review: Q21 and Q22 on the same 1-10 scale.
+const manualScoreValue = z.coerce
+  .number()
+  .int()
+  .min(MANUAL_SCORE_MIN)
+  .max(MANUAL_SCORE_MAX);
+
+export const objectiveReviewSchema = z.object({
+  submission_id: z.string().uuid(),
+  q21_manual_score: manualScoreValue,
+  q22_manual_score: manualScoreValue,
   admin_note: optionalText,
 });
 

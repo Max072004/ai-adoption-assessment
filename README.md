@@ -9,8 +9,9 @@ TypeScript, Tailwind CSS, and Supabase Postgres.
 - One submission per employee per calendar month
 - Signed, HTTP-only admin session cookie
 - Protected admin submission and review workflow
-- Month 3 assessment fields with backward-compatible legacy and Month 2 submissions
-- Q0 link and proof-file uploads through Supabase Storage
+- Objective assessment (Q1-Q20 auto-scored, Q21/Q22 manually reviewed) with
+  backward-compatible Month 1, Month 2, and Month 3 submissions
+- Q22 evidence link and proof-file uploads through Supabase Storage
 - Monthly rankings with final-score flags
 - CSV export
 - Supabase constraints and Row Level Security
@@ -96,18 +97,47 @@ Middleware also redirects unauthenticated admin page requests to the login scree
 
 ## Scoring
 
-Admins enter eight integer scores from 1 to 10. For Month 2 and Month 3, the
-eight manual scores map to Q1 through Q8. Q0 proof, Q9, and Q10 are
-informational only. The server calculates:
+### Current assessment (`assessment_version = "objective_v1"`)
+
+Employees answer 20 multiple-choice questions (Q1-Q20), select the AI tools they
+used (Q21), and share one piece of AI-assisted work as a link or file (Q22).
+
+- **Q1-Q20** are scored automatically on the server against the answer key in
+  `lib/assessment-scoring.ts` (server-only; never imported by client code).
+  Each correct answer is worth 2 marks, so `objective_score` is 0-40 and is
+  stored on the submission at insert time.
+- **Q21 and Q22** are reviewed manually by an admin on the established 1-10
+  scale (`q21_manual_score`, `q22_manual_score`).
+- `final_score = objective_score + q21_manual_score + q22_manual_score` (max 60)
+  and is recalculated every time an admin saves the review. Until both manual
+  scores are saved the submission stays `pending` and shows "Pending manual
+  review" instead of a final score.
+- Employees only ever receive a success confirmation. Scores, correctness, and
+  the answer key are never returned by `/api/submit`.
+
+### Legacy assessments (Month 1, Month 2, Month 3)
+
+Historical submissions have `assessment_version = null` and keep their original
+behaviour. Admins enter eight integer scores from 1 to 10 into the `scores`
+table:
 
 ```text
 raw_score = q0 + q1 + q2 + q3 + q4 + q5 + q6 + q7
 final_score = raw_score
 ```
 
-Employees are flagged only when the final score is below 50. The database keeps
-the AAM column for future use, but AAM is not used in score calculations,
-leaderboards, or CSV exports.
+Legacy employees are flagged below 50 / 80; objective submissions use the same
+62.5% cut-off (below 37.5 / 60). Rankings never compare the two models against
+each other: each model is ranked independently, and the CSV export labels every
+row with its assessment version.
+
+## Departments
+
+Active departments for new submissions: Marketing, Editor, AI / Tech, Sales,
+Accounts, HR, Admin, Operations, WiseTribes. Procurement and
+Engineering / Civil / Site are retired: their historical submissions remain
+visible and filterable in the admin dashboard, but they can no longer be
+selected on the employee form.
 
 ## Useful commands
 

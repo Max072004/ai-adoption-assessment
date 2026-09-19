@@ -2,35 +2,28 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import {
-  DEPARTMENTS,
-  Q10_SUPPORT_OPTIONS,
-  Q4_INTEGRATION_OPTIONS,
-  Q6_SKILL_OPTIONS,
-  Q7_SHARING_OPTIONS,
-  Q9_CHALLENGE_OPTIONS,
-} from "@/lib/constants";
+  ANSWER_LETTERS,
+  OBJECTIVE_QUESTIONS,
+  Q21_OTHER_OPTION,
+  Q21_OTHER_PROMPT,
+  Q21_QUESTION,
+  Q21_TOOL_OPTIONS,
+  Q22_QUESTION,
+  type AnswerLetter,
+  type ObjectiveQuestionId,
+  type Q21Tool,
+} from "@/lib/assessment";
+import { ACTIVE_DEPARTMENTS, displayDepartment } from "@/lib/constants";
+
+type Answers = Partial<Record<ObjectiveQuestionId, AnswerLetter>>;
 
 type FormState = {
   employee_id: string;
   name: string;
   department: string;
   role: string;
-  q0_proof: string;
-  q1_technology_text: string;
-  q2_use_case_text: string;
-  q3_problem_solving_text: string;
-  q4_integration_choice: "" | "Yes" | "No";
-  q4_integration_text: string;
-  q5_judgment_text: string;
-  q6_skill_choice: string;
-  q6_skill_example_text: string;
-  q7_sharing_choice: "" | "Yes" | "No";
-  q7_sharing_text: string;
-  q8_future_opportunity_text: string;
-  q9_challenge_choice: string;
-  q9_challenge_text: string;
-  q10_support_choice: string;
-  q10_support_text: string;
+  q21_other_text: string;
+  q22_evidence_link: string;
 };
 
 const initialState: FormState = {
@@ -38,49 +31,19 @@ const initialState: FormState = {
   name: "",
   department: "",
   role: "",
-  q0_proof: "",
-  q1_technology_text: "",
-  q2_use_case_text: "",
-  q3_problem_solving_text: "",
-  q4_integration_choice: "",
-  q4_integration_text: "",
-  q5_judgment_text: "",
-  q6_skill_choice: "",
-  q6_skill_example_text: "",
-  q7_sharing_choice: "",
-  q7_sharing_text: "",
-  q8_future_opportunity_text: "",
-  q9_challenge_choice: "",
-  q9_challenge_text: "",
-  q10_support_choice: "",
-  q10_support_text: "",
+  q21_other_text: "",
+  q22_evidence_link: "",
 };
 
 const SECTIONS = [
   { id: "details", number: "01", title: "Your Details", short: "Details" },
-  { id: "usage", number: "02", title: "Usage Snapshot", short: "Usage" },
-  {
-    id: "application",
-    number: "03",
-    title: "Practical Application",
-    short: "Application",
-  },
-  {
-    id: "exploration",
-    number: "04",
-    title: "Exploration & Curiosity",
-    short: "Exploration",
-  },
-  {
-    id: "growth",
-    number: "05",
-    title: "Confidence & Growth",
-    short: "Growth",
-  },
+  { id: "knowledge", number: "02", title: "AI Knowledge Check", short: "Q1-Q20" },
+  { id: "tools", number: "03", title: "AI Tools", short: "Q21" },
+  { id: "evidence", number: "04", title: "AI Work Evidence", short: "Q22" },
 ] as const;
 
-const UI_DEPARTMENTS = DEPARTMENTS.map((department) => ({
-  label: department === "Editor / Media" ? "Editor" : department,
+const UI_DEPARTMENTS = ACTIVE_DEPARTMENTS.map((department) => ({
+  label: displayDepartment(department),
   value: department,
 }));
 
@@ -189,56 +152,25 @@ function Question({
   );
 }
 
-function TextArea({
-  value,
-  onChange,
-  placeholder,
-  required,
-  minHeight = "min-h-36",
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  required?: boolean;
-  minHeight?: string;
-}) {
-  return (
-    <div>
-      <textarea
-        className={`field ${minHeight} resize-y leading-6`}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        required={required}
-        maxLength={MAX_TEXT}
-      />
-      <div className="mt-2 flex justify-end text-[11px] tabular-nums text-zinc-600">
-        {value.length.toLocaleString()} / {MAX_TEXT.toLocaleString()}
-      </div>
-    </div>
-  );
-}
-
-function RadioGroup({
+/** Single-select A-D options for one objective question. */
+function ChoiceGroup({
   name,
   options,
   value,
   onChange,
-  columns = 2,
 }: {
   name: string;
-  options: readonly string[];
-  value: string;
-  onChange: (value: string) => void;
-  columns?: 2 | 4;
+  options: Record<AnswerLetter, string>;
+  value: AnswerLetter | undefined;
+  onChange: (value: AnswerLetter) => void;
 }) {
   return (
-    <div className={`grid gap-3 ${columns === 4 ? "sm:grid-cols-2" : "sm:grid-cols-2"}`}>
-      {options.map((option, index) => {
-        const selected = value === option;
+    <div className="grid gap-3 sm:grid-cols-2">
+      {ANSWER_LETTERS.map((letter) => {
+        const selected = value === letter;
         return (
           <label
-            key={option}
+            key={letter}
             className={`group relative flex min-h-16 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3.5 transition duration-200 ${
               selected
                 ? "border-indigo-500/70 bg-indigo-500/10 shadow-[0_0_0_3px_rgba(99,102,241,0.08)]"
@@ -249,9 +181,9 @@ function RadioGroup({
               className="sr-only"
               type="radio"
               name={name}
-              value={option}
+              value={letter}
               checked={selected}
-              onChange={() => onChange(option)}
+              onChange={() => onChange(letter)}
               required
             />
             <span
@@ -261,12 +193,60 @@ function RadioGroup({
                   : "border-zinc-700 text-zinc-500 group-hover:border-zinc-600"
               }`}
             >
-              {selected ? <CheckIcon className="h-3.5 w-3.5" /> : index + 1}
+              {selected ? <CheckIcon className="h-3.5 w-3.5" /> : letter}
             </span>
             <span
               className={`text-sm leading-5 ${selected ? "text-white" : "text-zinc-400"}`}
             >
-              {option}
+              {options[letter]}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Multi-select tool checkboxes for Q21. */
+function ToolCheckboxes({
+  selected,
+  onToggle,
+}: {
+  selected: Set<Q21Tool>;
+  onToggle: (tool: Q21Tool) => void;
+}) {
+  return (
+    <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+      {Q21_TOOL_OPTIONS.map((tool) => {
+        const checked = selected.has(tool);
+        return (
+          <label
+            key={tool}
+            className={`group flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 transition duration-200 ${
+              checked
+                ? "border-indigo-500/70 bg-indigo-500/10"
+                : "border-zinc-800 bg-[#0d0d0d] hover:border-zinc-700 hover:bg-zinc-900"
+            }`}
+          >
+            <input
+              className="sr-only"
+              type="checkbox"
+              name="q21_tools"
+              value={tool}
+              checked={checked}
+              onChange={() => onToggle(tool)}
+            />
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
+                checked
+                  ? "border-indigo-400 bg-indigo-500 text-white"
+                  : "border-zinc-700 group-hover:border-zinc-600"
+              }`}
+            >
+              {checked && <CheckIcon className="h-3.5 w-3.5" />}
+            </span>
+            <span className={`text-sm leading-5 ${checked ? "text-white" : "text-zinc-400"}`}>
+              {tool}
             </span>
           </label>
         );
@@ -277,7 +257,9 @@ function RadioGroup({
 
 export function EmployeeForm() {
   const [form, setForm] = useState(initialState);
-  const [q0File, setQ0File] = useState<File | null>(null);
+  const [answers, setAnswers] = useState<Answers>({});
+  const [tools, setTools] = useState<Set<Q21Tool>>(() => new Set());
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -286,33 +268,35 @@ export function EmployeeForm() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function toggleTool(tool: Q21Tool) {
+    setTools((current) => {
+      const next = new Set(current);
+      if (next.has(tool)) {
+        next.delete(tool);
+      } else {
+        next.add(tool);
+      }
+      return next;
+    });
+    // Deselecting "Other" clears its conditional text.
+    if (tool === Q21_OTHER_OPTION && tools.has(Q21_OTHER_OPTION)) {
+      update("q21_other_text", "");
+    }
+  }
+
+  const otherSelected = tools.has(Q21_OTHER_OPTION);
+  const answeredCount = OBJECTIVE_QUESTIONS.filter((question) =>
+    Boolean(answers[question.id]),
+  ).length;
+
   const sectionCompletion = useMemo(
     () => [
       [form.employee_id, form.name, form.department, form.role].every(Boolean),
-      Boolean(
-        (form.q0_proof || q0File) &&
-          form.q1_technology_text &&
-          form.q2_use_case_text,
-      ),
-      Boolean(
-        form.q3_problem_solving_text &&
-          form.q4_integration_choice &&
-          (form.q4_integration_choice === "No" || form.q4_integration_text),
-      ),
-      Boolean(
-        form.q5_judgment_text &&
-          form.q6_skill_choice &&
-          form.q6_skill_example_text &&
-          form.q7_sharing_choice &&
-          (form.q7_sharing_choice === "No" || form.q7_sharing_text),
-      ),
-      Boolean(
-        form.q8_future_opportunity_text &&
-          form.q9_challenge_choice &&
-          form.q10_support_choice,
-      ),
+      answeredCount === OBJECTIVE_QUESTIONS.length,
+      tools.size > 0 && (!otherSelected || Boolean(form.q21_other_text.trim())),
+      Boolean(form.q22_evidence_link.trim() || evidenceFile),
     ],
-    [form, q0File],
+    [form, answeredCount, tools, otherSelected, evidenceFile],
   );
   const completedSections = sectionCompletion.filter(Boolean).length;
   const progress = Math.round((completedSections / SECTIONS.length) * 100);
@@ -324,10 +308,17 @@ export function EmployeeForm() {
 
     try {
       const formData = new FormData();
-      Object.entries(form).forEach(([key, value]) => {
-        formData.append(key, String(value));
+      formData.append("employee_id", form.employee_id);
+      formData.append("name", form.name);
+      formData.append("department", form.department);
+      formData.append("role", form.role);
+      OBJECTIVE_QUESTIONS.forEach((question) => {
+        formData.append(question.id, answers[question.id] ?? "");
       });
-      if (q0File) formData.append("q0_file", q0File);
+      tools.forEach((tool) => formData.append("q21_tools", tool));
+      formData.append("q21_other_text", otherSelected ? form.q21_other_text : "");
+      formData.append("q22_evidence_link", form.q22_evidence_link);
+      if (evidenceFile) formData.append("q22_evidence_file", evidenceFile);
 
       const response = await fetch("/api/submit", {
         method: "POST",
@@ -360,11 +351,10 @@ export function EmployeeForm() {
           </div>
           <p className="eyebrow mt-8">Assessment complete</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            You&apos;re all set.
+            Assessment submitted successfully.
           </h1>
           <p className="mx-auto mt-4 max-w-sm text-sm leading-7 text-zinc-400">
-            Your response has been submitted successfully. Thank you for taking the
-            time to share how AI fits into your work.
+            Thank you for completing this month&apos;s AI adoption assessment.
           </p>
           <div className="mx-auto mt-8 flex w-fit items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/70 px-4 py-2 text-xs text-zinc-500">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -396,11 +386,11 @@ export function EmployeeForm() {
           <div className="max-w-3xl">
             <p className="eyebrow">Your AI journey, this month</p>
             <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-6xl sm:leading-[1.05]">
-              How is AI changing the way you work?
+              Monthly AI adoption assessment
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-400 sm:text-lg sm:leading-8">
-              Share real examples, honest challenges, and the tools shaping your
-              workflow. There are no perfect answers, only useful ones.
+              Twenty quick multiple-choice questions, the AI tools you explored, and
+              one example of AI-assisted work. It takes about ten minutes.
             </p>
           </div>
         </header>
@@ -423,7 +413,7 @@ export function EmployeeForm() {
             </span>
           </div>
           <nav
-            className="mt-3 grid grid-cols-5 gap-1"
+            className="mt-3 grid grid-cols-4 gap-1"
             aria-label="Assessment sections"
           >
             {SECTIONS.map((section, index) => (
@@ -488,7 +478,7 @@ export function EmployeeForm() {
                 >
                   <option value="">Select department</option>
                   {UI_DEPARTMENTS.map((department) => (
-                    <option key={department.label} value={department.value}>
+                    <option key={department.value} value={department.value}>
                       {department.label}
                     </option>
                   ))}
@@ -509,15 +499,69 @@ export function EmployeeForm() {
           </Section>
 
           <Section
-            id="usage"
+            id="knowledge"
             number="02"
-            title="Evidence & Learning"
-            description="Share proof of real work and the new AI knowledge you built this month."
+            title="AI Knowledge Check"
+            description={`Questions 1 to 20. Select one answer for each question. ${answeredCount} of ${OBJECTIVE_QUESTIONS.length} answered.`}
+          >
+            {OBJECTIVE_QUESTIONS.map((question, index) => (
+              <Question
+                key={question.id}
+                number={`Q${index + 1}`}
+                title={question.title}
+              >
+                <ChoiceGroup
+                  name={question.id}
+                  options={question.options}
+                  value={answers[question.id]}
+                  onChange={(letter) =>
+                    setAnswers((current) => ({ ...current, [question.id]: letter }))
+                  }
+                />
+              </Question>
+            ))}
+          </Section>
+
+          <Section
+            id="tools"
+            number="03"
+            title="AI Tools"
+            description="Tell us which AI tools you have been working with."
           >
             <Question
-              number="Q0"
-              title="AI Work Evidence"
-              helper="Required: share one piece of AI-assisted work you completed this month that you are most proud of. Use a link or upload a PNG, JPG, JPEG, or PDF proof file."
+              number="Q21"
+              title={Q21_QUESTION}
+              helper="Select all that apply."
+            >
+              <ToolCheckboxes selected={tools} onToggle={toggleTool} />
+              {otherSelected && (
+                <div className="animate-fade-up mt-4">
+                  <label className="label">
+                    {Q21_OTHER_PROMPT}
+                    <input
+                      className="field"
+                      value={form.q21_other_text}
+                      onChange={(event) => update("q21_other_text", event.target.value)}
+                      placeholder="e.g. Mistral, Pika, Otter.ai"
+                      maxLength={MAX_TEXT}
+                      required
+                    />
+                  </label>
+                </div>
+              )}
+            </Question>
+          </Section>
+
+          <Section
+            id="evidence"
+            number="04"
+            title="AI Work Evidence"
+            description="Show us one real piece of AI-assisted work from this month."
+          >
+            <Question
+              number="Q22"
+              title={Q22_QUESTION}
+              helper="Required: share a link or upload a PNG, JPG, JPEG, or PDF file (up to 10 MB)."
             >
               <div className="space-y-4">
                 <label className="label">
@@ -525,232 +569,24 @@ export function EmployeeForm() {
                   <input
                     className="field"
                     type="url"
-                    value={form.q0_proof}
-                    onChange={(event) => update("q0_proof", event.target.value)}
+                    value={form.q22_evidence_link}
+                    onChange={(event) => update("q22_evidence_link", event.target.value)}
                     placeholder="https://example.com/your-ai-assisted-work"
                   />
                 </label>
                 <label className="label">
-                  Proof file
-                  <span className="helper">
-                    Screenshot or PDF upload, up to 10 MB
-                  </span>
+                  Evidence file
+                  <span className="helper">Screenshot or PDF upload, up to 10 MB</span>
                   <input
                     className="field file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-xs file:font-medium file:text-zinc-200 hover:file:bg-zinc-700"
                     type="file"
                     accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf"
                     onChange={(event) =>
-                      setQ0File(event.target.files?.item(0) ?? null)
+                      setEvidenceFile(event.target.files?.item(0) ?? null)
                     }
                   />
                 </label>
               </div>
-            </Question>
-
-            <Question
-              number="Q1"
-              title="What new AI tool, technology, feature, or technique did you research or learn about this month that is relevant to your work?"
-              helper="Tell us how you used it."
-            >
-              <TextArea
-                value={form.q1_technology_text}
-                onChange={(value) => update("q1_technology_text", value)}
-                placeholder="This month I learned about..."
-                required
-              />
-            </Question>
-
-            <Question
-              number="Q2"
-              title="Show us one task from your actual work where AI has become a useful part of your process."
-              helper="What exactly are you using AI for?"
-            >
-              <TextArea
-                value={form.q2_use_case_text}
-                onChange={(value) => update("q2_use_case_text", value)}
-                placeholder="One actual work task where AI is now useful is..."
-                required
-              />
-            </Question>
-          </Section>
-
-          <Section
-            id="application"
-            number="03"
-            title="Problem Solving & Integration"
-            description="Describe deeper AI use: experimentation, unusual problems, and combining AI with other tools."
-          >
-            <Question
-              number="Q3"
-              title="What was one difficult or unusual problem you tried to solve using AI this month?"
-              helper="What approach did you take, and what did you learn from the experience?"
-            >
-              <TextArea
-                value={form.q3_problem_solving_text}
-                onChange={(value) => update("q3_problem_solving_text", value)}
-                placeholder="The difficult or unusual problem was..."
-                required
-              />
-            </Question>
-            <Question
-              number="Q4"
-              title="Did you use AI together with another tool, software, or technology this month?"
-              helper="Examples could include spreadsheets, design tools, CRM, coding tools, automation, data analysis, internal software, or another department-specific tool."
-            >
-              <RadioGroup
-                name="q4_integration_choice"
-                options={Q4_INTEGRATION_OPTIONS}
-                value={form.q4_integration_choice}
-                onChange={(value) => {
-                  update("q4_integration_choice", value as "Yes" | "No");
-                  if (value === "No") update("q4_integration_text", "");
-                }}
-              />
-              {form.q4_integration_choice === "Yes" && (
-                <div className="animate-fade-up mt-4">
-                  <TextArea
-                    value={form.q4_integration_text}
-                    onChange={(value) => update("q4_integration_text", value)}
-                    placeholder="I combined AI with..."
-                    required
-                    minHeight="min-h-28"
-                  />
-                </div>
-              )}
-            </Question>
-          </Section>
-
-          <Section
-            id="exploration"
-            number="04"
-            title="Judgment & Skills"
-            description="Show how you verify AI output, improve your craft, and share useful AI practice."
-          >
-            <Question
-              number="Q5"
-              title="Describe one situation where you did not fully trust an AI-generated answer and had to verify, correct, or reject it."
-              helper="What did you do?"
-            >
-              <TextArea
-                value={form.q5_judgment_text}
-                onChange={(value) => update("q5_judgment_text", value)}
-                placeholder="I did not fully trust AI when..."
-                required
-              />
-            </Question>
-
-            <Question
-              number="Q6"
-              title="Which AI skill have you improved the most this month?"
-            >
-              <RadioGroup
-                name="q6_skill_choice"
-                options={Q6_SKILL_OPTIONS}
-                value={form.q6_skill_choice}
-                onChange={(value) => update("q6_skill_choice", value)}
-              />
-              <div className="mt-4">
-                <Question title="Give one example of how you used this skill this month.">
-                  <TextArea
-                    value={form.q6_skill_example_text}
-                    onChange={(value) => update("q6_skill_example_text", value)}
-                    placeholder="I used this skill when..."
-                    required
-                    minHeight="min-h-28"
-                  />
-                </Question>
-              </div>
-            </Question>
-
-            <Question
-              number="Q7"
-              title="Did you share an AI tool, prompt, workflow, or technique with someone else this month?"
-            >
-              <RadioGroup
-                name="q7_sharing_choice"
-                options={Q7_SHARING_OPTIONS}
-                value={form.q7_sharing_choice}
-                onChange={(value) => {
-                  update("q7_sharing_choice", value as "Yes" | "No");
-                  if (value === "No") update("q7_sharing_text", "");
-                }}
-              />
-              {form.q7_sharing_choice === "Yes" && (
-                <div className="animate-fade-up mt-4">
-                  <TextArea
-                    value={form.q7_sharing_text}
-                    onChange={(value) => update("q7_sharing_text", value)}
-                    placeholder="I shared..."
-                    required
-                    minHeight="min-h-28"
-                  />
-                </div>
-              )}
-            </Question>
-          </Section>
-
-          <Section
-            id="growth"
-            number="05"
-            title="Future Opportunities & Support"
-            description="Identify the next opportunity for AI and what support would make adoption easier."
-          >
-            <Question
-              number="Q8"
-              title="What is one task in your role that you believe AI could significantly improve, but you haven't figured out how to use AI for yet?"
-            >
-              <TextArea
-                value={form.q8_future_opportunity_text}
-                onChange={(value) => update("q8_future_opportunity_text", value)}
-                placeholder="One future opportunity is..."
-                required
-              />
-            </Question>
-
-            <Question
-              number="Q9"
-              title="What is currently stopping you from getting more value from AI in your role?"
-              helper="Informational only. This question is not scored."
-            >
-              <RadioGroup
-                name="q9_challenge_choice"
-                options={Q9_CHALLENGE_OPTIONS}
-                value={form.q9_challenge_choice}
-                onChange={(value) => update("q9_challenge_choice", value)}
-              />
-              {form.q9_challenge_choice === "Other" && (
-                <div className="mt-4">
-                  <TextArea
-                    value={form.q9_challenge_text}
-                    onChange={(value) => update("q9_challenge_text", value)}
-                    placeholder="Optional context..."
-                    minHeight="min-h-24"
-                  />
-                </div>
-              )}
-            </Question>
-
-            <Question
-              number="Q10"
-              title="What would help you become better at using AI in your role?"
-              helper="Informational only. This question is not scored."
-            >
-              <RadioGroup
-                name="q10_support_choice"
-                options={Q10_SUPPORT_OPTIONS}
-                value={form.q10_support_choice}
-                onChange={(value) => update("q10_support_choice", value)}
-              />
-              {form.q10_support_choice === "Other" && (
-                <div className="mt-4">
-                  <TextArea
-                    value={form.q10_support_text}
-                    onChange={(value) => update("q10_support_text", value)}
-                    placeholder="Optional context..."
-                    minHeight="min-h-24"
-                  />
-                </div>
-              )}
             </Question>
           </Section>
 

@@ -3,15 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminHeader } from "@/components/admin-header";
-import { DEPARTMENTS } from "@/lib/constants";
+import {
+  ACTIVE_DEPARTMENTS,
+  ALL_DEPARTMENTS,
+  displayDepartment,
+} from "@/lib/constants";
 import type { Ranking, Submission } from "@/lib/types";
 
 type Tab = "submissions" | "rankings";
-
-const FILTER_DEPARTMENTS = DEPARTMENTS.map((department) => ({
-  label: department === "Editor / Media" ? "Editor" : department,
-  value: department,
-}));
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -40,13 +39,13 @@ function shortDate(value: string) {
   }).format(new Date(value));
 }
 
-function displayDepartment(value: string) {
-  return value === "Editor / Media" ? "Editor" : value;
+function escapeCsv(value: string | number | boolean | null | undefined) {
+  const text = value == null ? "" : String(value);
+  return `"${text.replaceAll('"', '""')}"`;
 }
 
-function escapeCsv(value: string | number | boolean) {
-  const text = String(value);
-  return `"${text.replaceAll('"', '""')}"`;
+function scoreLabel(row: Ranking) {
+  return `${row.final_score} / ${row.max_score}`;
 }
 
 function SearchIcon() {
@@ -184,6 +183,29 @@ export function AdminDashboard() {
     };
   }, [submissions]);
 
+  // Active departments are always offered. Retired departments (Procurement,
+  // Engineering / Civil / Site) appear only when the loaded month has rows
+  // for them, so historical records stay filterable without being promoted.
+  const filterDepartments = useMemo(() => {
+    const present = new Set(submissions.map((item) => item.department));
+    return ALL_DEPARTMENTS.filter(
+      (item) => ACTIVE_DEPARTMENTS.includes(item) || present.has(item),
+    ).map((value) => ({ label: displayDepartment(value), value }));
+  }, [submissions]);
+
+  useEffect(() => {
+    if (department && !filterDepartments.some((item) => item.value === department)) {
+      setDepartment("");
+    }
+  }, [department, filterDepartments]);
+
+  const hasMixedModels = useMemo(
+    () =>
+      rankings.some((row) => row.scoring_model === "objective") &&
+      rankings.some((row) => row.scoring_model === "legacy"),
+    [rankings],
+  );
+
   const visibleSubmissions = useMemo(() => {
     const query = search.trim().toLowerCase();
     return submissions.filter((item) => {
@@ -214,17 +236,39 @@ export function AdminDashboard() {
       "Name",
       "Department",
       "Role",
+      "Month",
+      "Assessment Version",
+      "Objective Score",
+      "Q21 Manual Score",
+      "Q22 Manual Score",
       "Final Score",
+      "Max Score",
       "Flagged",
+      "Q21 Tools",
+      "Q21 Other",
+      "Q22 Evidence Link",
+      "Q22 Evidence File",
     ];
+    // Legacy rows (Month 1/2/3) keep their /80 final score and leave the
+    // objective-only columns blank; current rows fill every column.
     const rows = rankings.map((row) => [
       row.rank,
       row.employee_id,
       row.name,
       row.department,
       row.role,
+      row.month_year,
+      row.assessment_version ?? "legacy",
+      row.objective_score,
+      row.q21_manual_score,
+      row.q22_manual_score,
       row.final_score,
+      row.max_score,
       row.flagged ? "Yes" : "No",
+      row.q21_tools?.join("; ") ?? "",
+      row.q21_other_text,
+      row.q22_evidence_link,
+      row.q22_evidence_file,
     ]);
     const csv = [headers, ...rows]
       .map((row) => row.map(escapeCsv).join(","))
@@ -384,8 +428,8 @@ export function AdminDashboard() {
                       onChange={(event) => setDepartment(event.target.value)}
                     >
                       <option value="">All departments</option>
-                      {FILTER_DEPARTMENTS.map((item) => (
-                        <option key={item.label} value={item.value}>
+                      {filterDepartments.map((item) => (
+                        <option key={item.value} value={item.value}>
                           {item.label}
                         </option>
                       ))}
@@ -541,6 +585,8 @@ export function AdminDashboard() {
                 <h2 className="text-lg font-semibold text-white">Monthly leaderboard</h2>
                 <p className="mt-1 text-xs text-zinc-500">
                   Ranked by final score.
+                  {hasMixedModels &&
+                    " This month contains both current and legacy assessments; each is ranked separately."}
                 </p>
               </div>
               <button
@@ -610,8 +656,13 @@ export function AdminDashboard() {
                         <td className="truncate px-5 py-4">{row.role}</td>
                         <td className="px-5 py-4 text-right">
                           <div className="font-semibold tabular-nums text-white">
-                            {row.final_score} / 80
+                            {scoreLabel(row)}
                           </div>
+                          {row.scoring_model === "legacy" && hasMixedModels && (
+                            <span className="mt-1 mr-1 inline-flex rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
+                              Legacy
+                            </span>
+                          )}
                           {row.flagged && (
                             <span className="mt-1 inline-flex rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-300">
                               Flagged
@@ -679,7 +730,10 @@ export function AdminDashboard() {
                           </div>
                         </div>
                         <div className="mt-4 flex items-center justify-between border-t border-zinc-800 pt-3 text-xs text-zinc-500">
-                          <span>Final Score: {row.final_score} / 80</span>
+                          <span>
+                            Final Score: {scoreLabel(row)}
+                            {row.scoring_model === "legacy" && hasMixedModels && " · Legacy"}
+                          </span>
                           {row.flagged && (
                             <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-red-300">
                               Flagged

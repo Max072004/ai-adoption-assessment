@@ -4,7 +4,18 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AdminHeader } from "@/components/admin-header";
-import { DEPARTMENT_CONTEXT_NOTES } from "@/lib/constants";
+import {
+  FINAL_MAX_SCORE,
+  MANUAL_SCORE_MAX,
+  MANUAL_SCORE_MIN,
+  OBJECTIVE_ASSESSMENT_VERSION,
+  OBJECTIVE_MAX_SCORE,
+  OBJECTIVE_QUESTIONS,
+  Q21_OTHER_OPTION,
+  Q21_QUESTION,
+  Q22_QUESTION,
+} from "@/lib/assessment";
+import { DEPARTMENT_CONTEXT_NOTES, displayDepartment } from "@/lib/constants";
 import type { Score, SubmissionDetail } from "@/lib/types";
 
 type ScoreKey =
@@ -256,6 +267,10 @@ const MONTH_3_INFO_QUESTIONS = [
   },
 ] as const;
 
+type InfoQuestion =
+  | (typeof MONTH_2_INFO_QUESTIONS)[number]
+  | (typeof MONTH_3_INFO_QUESTIONS)[number];
+
 type ScoreState = Record<ScoreKey, string>;
 
 const blankScores: ScoreState = {
@@ -275,7 +290,11 @@ function answerText(submission: SubmissionDetail, answer: string) {
     if (submission.q0_file_url) return "Uploaded proof file provided.";
     return "No response provided.";
   }
-  if (answer === "q1_scale") return `${submission.q1_scale} / 10`;
+  if (answer === "q1_scale") {
+    return submission.q1_scale == null
+      ? "No response provided."
+      : `${submission.q1_scale} / 10`;
+  }
   if (answer === "q5_yesno") {
     return submission.q5_yesno === "Yes"
       ? `Yes - ${submission.q5_detail || "No detail provided."}`
@@ -334,8 +353,23 @@ function getScoreRecord(value: Score | Score[] | null) {
   return value;
 }
 
-function displayDepartment(value: string) {
-  return value === "Editor / Media" ? "Editor" : value;
+function isObjectiveSubmission(submission: SubmissionDetail) {
+  return submission.assessment_version === OBJECTIVE_ASSESSMENT_VERSION;
+}
+
+type ManualKey = "q21_manual_score" | "q22_manual_score";
+type ManualState = Record<ManualKey, string>;
+
+const blankManual: ManualState = { q21_manual_score: "", q22_manual_score: "" };
+
+function isValidManual(value: string) {
+  const numeric = Number(value);
+  return (
+    value !== "" &&
+    Number.isInteger(numeric) &&
+    numeric >= MANUAL_SCORE_MIN &&
+    numeric <= MANUAL_SCORE_MAX
+  );
 }
 
 function BackIcon() {
@@ -403,6 +437,7 @@ export function ReviewForm() {
   const router = useRouter();
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
   const [scores, setScores] = useState<ScoreState>(blankScores);
+  const [manual, setManual] = useState<ManualState>(blankManual);
   const [adminNote, setAdminNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -420,7 +455,14 @@ export function ReviewForm() {
         setSubmission(detail);
         setAdminNote(detail.admin_note ?? "");
 
-        if (existingScores) {
+        if (isObjectiveSubmission(detail)) {
+          setManual({
+            q21_manual_score:
+              detail.q21_manual_score == null ? "" : String(detail.q21_manual_score),
+            q22_manual_score:
+              detail.q22_manual_score == null ? "" : String(detail.q22_manual_score),
+          });
+        } else if (existingScores) {
           setScores(
             Object.fromEntries(
               Object.keys(blankScores).map((key) => [
@@ -456,18 +498,32 @@ export function ReviewForm() {
     return { completed, raw };
   }, [scores]);
 
-  const month3 = submission ? isMonth3Submission(submission) : false;
-  const month2 = submission ? !month3 && isMonth2Submission(submission) : false;
+  const objective = submission ? isObjectiveSubmission(submission) : false;
+  const objectiveScore = submission?.objective_score ?? null;
+  const manualComplete =
+    isValidManual(manual.q21_manual_score) && isValidManual(manual.q22_manual_score);
+  // Final score is only shown once both manual marks are valid; otherwise it
+  // stays "pending" rather than pretending the review is complete.
+  const objectiveFinal =
+    objective && manualComplete && objectiveScore != null
+      ? objectiveScore + Number(manual.q21_manual_score) + Number(manual.q22_manual_score)
+      : null;
+
+  const month3 = submission && !objective ? isMonth3Submission(submission) : false;
+  const month2 =
+    submission && !objective ? !month3 && isMonth2Submission(submission) : false;
   const questions = month3
     ? MONTH_3_QUESTIONS
     : month2
       ? MONTH_2_QUESTIONS
       : LEGACY_QUESTIONS;
-  const infoQuestions = month3
+  const infoQuestions: readonly InfoQuestion[] = month3
     ? MONTH_3_INFO_QUESTIONS
     : month2
       ? MONTH_2_INFO_QUESTIONS
       : [];
+
+  const canSave = objective ? manualComplete : scoringSummary.completed >= 8;
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -475,16 +531,24 @@ export function ReviewForm() {
     setError("");
 
     try {
+      const body = objective
+        ? {
+            submission_id: id,
+            q21_manual_score: Number(manual.q21_manual_score),
+            q22_manual_score: Number(manual.q22_manual_score),
+            admin_note: adminNote,
+          }
+        : {
+            submission_id: id,
+            ...Object.fromEntries(
+              Object.entries(scores).map(([key, value]) => [key, Number(value)]),
+            ),
+            admin_note: adminNote,
+          };
       const response = await fetch("/api/admin/score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          submission_id: id,
-          ...Object.fromEntries(
-            Object.entries(scores).map(([key, value]) => [key, Number(value)]),
-          ),
-          admin_note: adminNote,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
@@ -550,6 +614,9 @@ export function ReviewForm() {
                       >
                         {submission.status === "reviewed" ? "Reviewed" : "Pending review"}
                       </span>
+                      <span className="rounded-full border border-zinc-700 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                        {objective ? "Objective assessment" : "Legacy assessment"}
+                      </span>
                     </div>
                     <h1 className="mt-2 truncate text-2xl font-semibold tracking-tight text-white sm:text-3xl">
                       {submission.name}
@@ -564,13 +631,17 @@ export function ReviewForm() {
                     <p className="text-[10px] uppercase tracking-wider text-zinc-600">
                       Questions
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-zinc-200">8 scored</p>
+                    <p className="mt-1 text-sm font-semibold text-zinc-200">
+                      {objective ? "20 auto + 2 manual" : "8 scored"}
+                    </p>
                   </div>
                   <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 px-4 py-3">
                     <p className="text-[10px] uppercase tracking-wider text-zinc-600">
                       Final score range
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-zinc-200">8-80 raw</p>
+                    <p className="mt-1 text-sm font-semibold text-zinc-200">
+                      {objective ? `0-${FINAL_MAX_SCORE}` : "8-80 raw"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -614,176 +685,148 @@ export function ReviewForm() {
                       Review the full assessment
                     </h2>
                   </div>
-                  <div className="space-y-3">
-                    {(month2 || month3) && (
-                      <article className="surface-card scroll-mt-24 p-5 sm:p-6">
-                        <div className="flex items-start gap-3">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-[11px] font-bold text-zinc-400">
-                            Q0
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
-                              Evidence
-                            </p>
-                            <h3 className="mt-1 text-sm font-semibold leading-6 text-zinc-200">
-                              {month3 ? "AI Work Evidence" : "AI Work Evidence"}
-                            </h3>
-                          </div>
-                        </div>
-                        <div className="mt-5 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
-                          <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
-                            {answerText(submission, "q0_proof")}
-                          </p>
-                          {submission.q0_file_url && (
-                            <a
-                              className="mt-3 inline-flex text-sm font-medium text-indigo-300 transition hover:text-indigo-200"
-                              href={submission.q0_file_url}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Open uploaded proof
-                            </a>
-                          )}
-                        </div>
-                      </article>
-                    )}
-
-                    {questions.map((question, index) => (
-                      <article
-                        id={`response-${index}`}
-                        key={question.score}
-                        className="surface-card scroll-mt-24 p-5 sm:p-6"
-                      >
-                        <div className="flex items-start gap-3">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-[11px] font-bold text-zinc-400">
-                            {question.number}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
-                              {question.group}
-                            </p>
-                            <h3 className="mt-1 text-sm font-semibold leading-6 text-zinc-200">
-                              {question.label}
-                            </h3>
-                          </div>
-                        </div>
-                        <div className="mt-5 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
-                          <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
-                            {answerText(submission, question.answer)}
-                          </p>
-                          {question.answer === "q0_proof" && submission.q0_file_url && (
-                            <a
-                              className="mt-3 inline-flex text-sm font-medium text-indigo-300 transition hover:text-indigo-200"
-                              href={submission.q0_file_url}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Open uploaded proof
-                            </a>
-                          )}
-                        </div>
-                      </article>
-                    ))}
-
-                    {month2 || month3 ? (
-                      infoQuestions.map((question) => (
-                        <article key={question.number} className="surface-card p-5 sm:p-6">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-md bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-500">
-                              {question.number}
-                            </span>
-                            <span className="rounded-full border border-zinc-700 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-                              Informational only · Not scored
-                            </span>
-                          </div>
-                          <h3 className="mt-4 text-sm font-semibold text-zinc-200">
-                            {question.label}
-                          </h3>
-                          <div className="mt-4 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
-                            <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
-                              {infoAnswerText(
-                                submission,
-                                question.answer,
-                                "detail" in question ? question.detail : undefined,
-                              )}
-                            </p>
-                          </div>
-                        </article>
-                      ))
-                    ) : (
-                      <article className="surface-card p-5 sm:p-6">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-md bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-500">
-                            Q8
-                          </span>
-                          <span className="rounded-full border border-zinc-700 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-                            Training needs only · Not scored
-                          </span>
-                        </div>
-                        <h3 className="mt-4 text-sm font-semibold text-zinc-200">
-                          Frustrations or confusion
-                        </h3>
-                        <div className="mt-4 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
-                          <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
-                            {submission.q8_text || "No response provided."}
-                          </p>
-                        </div>
-                      </article>
-                    )}
-                  </div>
+                  {objective ? (
+                    <ObjectiveResponses submission={submission} />
+                  ) : (
+                    <LegacyResponses
+                      submission={submission}
+                      month2={month2}
+                      month3={month3}
+                      questions={questions}
+                      infoQuestions={infoQuestions}
+                    />
+                  )}
                 </div>
               </div>
 
               <aside className="xl:sticky xl:top-24">
                 <div className="surface-card overflow-hidden">
-                  <div className="border-b border-zinc-800 p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="eyebrow">Scoring panel</p>
-                        <h2 className="mt-2 text-lg font-semibold text-white">
-                          Final score
-                        </h2>
+                  {objective ? (
+                    <>
+                      <div className="border-b border-zinc-800 p-5">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="eyebrow">Scoring panel</p>
+                            <h2 className="mt-2 text-lg font-semibold text-white">
+                              Final score
+                            </h2>
+                          </div>
+                          <div className="text-right">
+                            {objectiveFinal == null ? (
+                              <p className="text-sm font-semibold text-amber-300">
+                                Pending manual review
+                              </p>
+                            ) : (
+                              <p className="text-2xl font-semibold tabular-nums text-white">
+                                {objectiveFinal}
+                                <span className="text-sm font-normal text-zinc-600">
+                                  {" "}
+                                  / {FINAL_MAX_SCORE}
+                                </span>
+                              </p>
+                            )}
+                            <p className="mt-1 text-[10px] uppercase tracking-wider text-zinc-600">
+                              Objective + Q21 + Q22
+                            </p>
+                          </div>
+                        </div>
+                        <dl className="mt-4 space-y-2 text-sm">
+                          <div className="flex items-center justify-between">
+                            <dt className="text-zinc-500">Objective score (Q1-Q20)</dt>
+                            <dd className="font-semibold tabular-nums text-zinc-200">
+                              {objectiveScore ?? "--"} / {OBJECTIVE_MAX_SCORE}
+                            </dd>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <dt className="text-zinc-500">Q21 manual score</dt>
+                            <dd className="font-semibold tabular-nums text-zinc-200">
+                              {isValidManual(manual.q21_manual_score)
+                                ? manual.q21_manual_score
+                                : "--"}{" "}
+                              / {MANUAL_SCORE_MAX}
+                            </dd>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <dt className="text-zinc-500">Q22 manual score</dt>
+                            <dd className="font-semibold tabular-nums text-zinc-200">
+                              {isValidManual(manual.q22_manual_score)
+                                ? manual.q22_manual_score
+                                : "--"}{" "}
+                              / {MANUAL_SCORE_MAX}
+                            </dd>
+                          </div>
+                        </dl>
                       </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-semibold tabular-nums text-white">
-                          {scoringSummary.raw}
-                          <span className="text-sm font-normal text-zinc-600"> / 80</span>
-                        </p>
-                        <p className="mt-1 text-[10px] uppercase tracking-wider text-zinc-600">
-                          Raw total
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-zinc-800">
-                      <div
-                        className="h-full rounded-full bg-indigo-500 transition-all duration-300"
-                        style={{ width: `${(scoringSummary.completed / 8) * 100}%` }}
-                      />
-                    </div>
-                    <p className="mt-2 text-xs text-zinc-600">
-                      {scoringSummary.completed} of 8 scores complete
-                    </p>
-                  </div>
 
-                  <div className="max-h-none space-y-2.5 p-4 xl:max-h-[calc(100vh-370px)] xl:overflow-y-auto">
-                    {questions.map((question, index) => (
-                      <ScoreControl
-                        key={question.score}
-                        label={
-                          month2 || month3
-                            ? `Score ${index + 1} · ${question.number} · ${question.short}`
-                            : `${question.number} · ${question.short}`
-                        }
-                        value={scores[question.score]}
-                        onChange={(value) =>
-                          setScores((current) => ({
-                            ...current,
-                            [question.score]: value,
-                          }))
-                        }
-                      />
-                    ))}
-                  </div>
+                      <div className="space-y-2.5 p-4">
+                        <ScoreControl
+                          label="Q21 · AI tools"
+                          value={manual.q21_manual_score}
+                          onChange={(value) =>
+                            setManual((current) => ({ ...current, q21_manual_score: value }))
+                          }
+                        />
+                        <ScoreControl
+                          label="Q22 · AI work evidence"
+                          value={manual.q22_manual_score}
+                          onChange={(value) =>
+                            setManual((current) => ({ ...current, q22_manual_score: value }))
+                          }
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="border-b border-zinc-800 p-5">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="eyebrow">Scoring panel</p>
+                            <h2 className="mt-2 text-lg font-semibold text-white">
+                              Final score
+                            </h2>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-semibold tabular-nums text-white">
+                              {scoringSummary.raw}
+                              <span className="text-sm font-normal text-zinc-600"> / 80</span>
+                            </p>
+                            <p className="mt-1 text-[10px] uppercase tracking-wider text-zinc-600">
+                              Raw total
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                          <div
+                            className="h-full rounded-full bg-indigo-500 transition-all duration-300"
+                            style={{ width: `${(scoringSummary.completed / 8) * 100}%` }}
+                          />
+                        </div>
+                        <p className="mt-2 text-xs text-zinc-600">
+                          {scoringSummary.completed} of 8 scores complete
+                        </p>
+                      </div>
+
+                      <div className="max-h-none space-y-2.5 p-4 xl:max-h-[calc(100vh-370px)] xl:overflow-y-auto">
+                        {questions.map((question, index) => (
+                          <ScoreControl
+                            key={question.score}
+                            label={
+                              month2 || month3
+                                ? `Score ${index + 1} · ${question.number} · ${question.short}`
+                                : `${question.number} · ${question.short}`
+                            }
+                            value={scores[question.score]}
+                            onChange={(value) =>
+                              setScores((current) => ({
+                                ...current,
+                                [question.score]: value,
+                              }))
+                            }
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
 
                   <div className="border-t border-zinc-800 p-4">
                     <label className="label">
@@ -803,10 +846,7 @@ export function ReviewForm() {
                       </div>
                     )}
 
-                    <button
-                      className="button-primary mt-4 w-full"
-                      disabled={saving || scoringSummary.completed < 8}
-                    >
+                    <button className="button-primary mt-4 w-full" disabled={saving || !canSave}>
                       {saving && (
                         <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                       )}
@@ -818,6 +858,7 @@ export function ReviewForm() {
                     </button>
                     <p className="mt-3 text-center text-[10px] leading-4 text-zinc-600">
                       Saving updates the employee&apos;s status and monthly ranking.
+                      Scores are never shown to employees.
                     </p>
                   </div>
                 </div>
@@ -826,6 +867,290 @@ export function ReviewForm() {
           </form>
         )}
       </main>
+    </div>
+  );
+}
+
+function ResponseCard({
+  number,
+  group,
+  label,
+  badge,
+  children,
+}: {
+  number: string;
+  group: string;
+  label: string;
+  badge?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <article className="surface-card scroll-mt-24 p-5 sm:p-6">
+      <div className="flex items-start gap-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-[11px] font-bold text-zinc-400">
+          {number}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+              {group}
+            </p>
+            {badge && (
+              <span className="rounded-full border border-zinc-700 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                {badge}
+              </span>
+            )}
+          </div>
+          <h3 className="mt-1 text-sm font-semibold leading-6 text-zinc-200">{label}</h3>
+        </div>
+      </div>
+      <div className="mt-5 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
+        {children}
+      </div>
+    </article>
+  );
+}
+
+/** Objective assessment (Q1-Q20 auto-scored, Q21/Q22 manual) response cards. */
+function ObjectiveResponses({ submission }: { submission: SubmissionDetail }) {
+  const breakdown = submission.objective_breakdown ?? null;
+  const tools = submission.q21_tools ?? [];
+  const otherText = tools.includes(Q21_OTHER_OPTION) ? submission.q21_other_text : null;
+
+  return (
+    <div className="space-y-3">
+      <ResponseCard
+        number="Q1-20"
+        group="Objective assessment"
+        label="Q1-Q20 automatically evaluated"
+        badge="Auto-scored · No manual input"
+      >
+        <div className="flex items-baseline justify-between gap-4">
+          <p className="text-sm text-zinc-500">Objective score</p>
+          <p className="text-2xl font-semibold tabular-nums text-white">
+            {submission.objective_score ?? "--"}
+            <span className="text-sm font-normal text-zinc-600"> / {OBJECTIVE_MAX_SCORE}</span>
+          </p>
+        </div>
+        {breakdown && (
+          <div className="mt-4 grid grid-cols-5 gap-2 sm:grid-cols-10">
+            {OBJECTIVE_QUESTIONS.map((question, index) => {
+              const result = breakdown[question.id];
+              return (
+                <div
+                  key={question.id}
+                  title={`Q${index + 1}: ${question.title}`}
+                  className={`rounded-lg border px-1.5 py-2 text-center ${
+                    result?.correct
+                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+                      : "border-red-500/20 bg-red-500/10 text-red-300"
+                  }`}
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-wider opacity-70">
+                    Q{index + 1}
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold">{result?.answer ?? "-"}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-3 text-xs text-zinc-600">
+          2 marks per correct answer. Selected letters are shown; green is correct.
+        </p>
+      </ResponseCard>
+
+      <ResponseCard number="Q21" group="AI tools" label={Q21_QUESTION} badge="Manual score">
+        {tools.length === 0 ? (
+          <p className="text-[15px] leading-7 text-zinc-300">No tools selected.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {tools.map((tool) => (
+              <span
+                key={tool}
+                className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-sm text-zinc-200"
+              >
+                {tool}
+              </span>
+            ))}
+          </div>
+        )}
+        {otherText && (
+          <div className="mt-4 border-t border-zinc-800 pt-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+              Other tool(s)
+            </p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
+              {otherText}
+            </p>
+          </div>
+        )}
+      </ResponseCard>
+
+      <ResponseCard
+        number="Q22"
+        group="AI work evidence"
+        label={Q22_QUESTION}
+        badge="Manual score"
+      >
+        {submission.q0_proof ? (
+          <a
+            className="break-all text-[15px] font-medium leading-7 text-indigo-300 transition hover:text-indigo-200"
+            href={submission.q0_proof}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {submission.q0_proof}
+          </a>
+        ) : (
+          <p className="text-[15px] leading-7 text-zinc-300">
+            {submission.q0_file_url ? "Uploaded evidence file provided." : "No evidence provided."}
+          </p>
+        )}
+        {submission.q0_file_url && (
+          <a
+            className="mt-3 inline-flex text-sm font-medium text-indigo-300 transition hover:text-indigo-200"
+            href={submission.q0_file_url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open uploaded evidence
+          </a>
+        )}
+      </ResponseCard>
+    </div>
+  );
+}
+
+/** Legacy Month 1/2/3 response cards (unchanged behaviour). */
+function LegacyResponses({
+  submission,
+  month2,
+  month3,
+  questions,
+  infoQuestions,
+}: {
+  submission: SubmissionDetail;
+  month2: boolean;
+  month3: boolean;
+  questions: ReviewQuestion[];
+  infoQuestions: readonly InfoQuestion[];
+}) {
+  return (
+    <div className="space-y-3">
+      {(month2 || month3) && (
+        <article className="surface-card scroll-mt-24 p-5 sm:p-6">
+          <div className="flex items-start gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-[11px] font-bold text-zinc-400">
+              Q0
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+                Evidence
+              </p>
+              <h3 className="mt-1 text-sm font-semibold leading-6 text-zinc-200">
+                AI Work Evidence
+              </h3>
+            </div>
+          </div>
+          <div className="mt-5 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
+            <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
+              {answerText(submission, "q0_proof")}
+            </p>
+            {submission.q0_file_url && (
+              <a
+                className="mt-3 inline-flex text-sm font-medium text-indigo-300 transition hover:text-indigo-200"
+                href={submission.q0_file_url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open uploaded proof
+              </a>
+            )}
+          </div>
+        </article>
+      )}
+
+      {questions.map((question, index) => (
+        <article
+          id={`response-${index}`}
+          key={question.score}
+          className="surface-card scroll-mt-24 p-5 sm:p-6"
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-[11px] font-bold text-zinc-400">
+              {question.number}
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+                {question.group}
+              </p>
+              <h3 className="mt-1 text-sm font-semibold leading-6 text-zinc-200">
+                {question.label}
+              </h3>
+            </div>
+          </div>
+          <div className="mt-5 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
+            <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
+              {answerText(submission, question.answer)}
+            </p>
+            {question.answer === "q0_proof" && submission.q0_file_url && (
+              <a
+                className="mt-3 inline-flex text-sm font-medium text-indigo-300 transition hover:text-indigo-200"
+                href={submission.q0_file_url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open uploaded proof
+              </a>
+            )}
+          </div>
+        </article>
+      ))}
+
+      {month2 || month3 ? (
+        infoQuestions.map((question) => (
+          <article key={question.number} className="surface-card p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-500">
+                {question.number}
+              </span>
+              <span className="rounded-full border border-zinc-700 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                Informational only · Not scored
+              </span>
+            </div>
+            <h3 className="mt-4 text-sm font-semibold text-zinc-200">{question.label}</h3>
+            <div className="mt-4 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
+              <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
+                {infoAnswerText(
+                  submission,
+                  question.answer,
+                  "detail" in question ? question.detail : undefined,
+                )}
+              </p>
+            </div>
+          </article>
+        ))
+      ) : (
+        <article className="surface-card p-5 sm:p-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-md bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-500">
+              Q8
+            </span>
+            <span className="rounded-full border border-zinc-700 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+              Training needs only · Not scored
+            </span>
+          </div>
+          <h3 className="mt-4 text-sm font-semibold text-zinc-200">
+            Frustrations or confusion
+          </h3>
+          <div className="mt-4 rounded-xl border border-zinc-800/80 bg-[#0d0d0d] px-4 py-4 sm:px-5">
+            <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-zinc-300">
+              {submission.q8_text || "No response provided."}
+            </p>
+          </div>
+        </article>
+      )}
     </div>
   );
 }

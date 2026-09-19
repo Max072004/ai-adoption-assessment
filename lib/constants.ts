@@ -12,7 +12,30 @@ export const DEPARTMENT_AAM = {
   WiseTribes: 1.0,
 } as const;
 
-export const DEPARTMENTS = Object.keys(DEPARTMENT_AAM);
+/**
+ * Every department that has ever been submittable. Used for reading, filtering,
+ * and displaying historical records.
+ */
+export const ALL_DEPARTMENTS = Object.keys(DEPARTMENT_AAM);
+
+/**
+ * Departments retired from new submissions. Historical rows keep these values
+ * and remain fully readable in the admin dashboard.
+ */
+export const RETIRED_DEPARTMENTS = [
+  "Procurement",
+  "Engineering / Civil / Site",
+] as const;
+
+/** Departments selectable on the current employee form. */
+export const ACTIVE_DEPARTMENTS = ALL_DEPARTMENTS.filter(
+  (department) =>
+    !(RETIRED_DEPARTMENTS as readonly string[]).includes(department),
+);
+
+export function displayDepartment(value: string) {
+  return value === "Editor / Media" ? "Editor" : value;
+}
 
 export const DEPARTMENT_CONTEXT_NOTES: Record<string, string> = {
   Operations:
@@ -37,6 +60,13 @@ export const DEPARTMENT_CONTEXT_NOTES: Record<string, string> = {
   WiseTribes:
     "AI use in community building, content, operations, member communication, and process improvement is most relevant.",
 };
+
+// ---------------------------------------------------------------------------
+// Historical option lists for the Month 1 (Q6/Q7), Month 2, and Month 3
+// assessments. No longer used by the current employee form; kept so the
+// values stored on legacy rows remain documented. The current assessment's
+// questions and options live in lib/assessment.ts.
+// ---------------------------------------------------------------------------
 
 export const Q6_OPTIONS = [
   "Give up and do it manually",
