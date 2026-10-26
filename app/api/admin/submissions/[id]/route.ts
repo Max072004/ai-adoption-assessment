@@ -3,8 +3,9 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/api";
 import {
   answerColumn,
-  OBJECTIVE_ASSESSMENT_VERSION,
+  isObjectiveVersion,
   OBJECTIVE_QUESTION_IDS,
+  type ObjectiveAssessmentVersion,
 } from "@/lib/assessment";
 import { scoreObjectiveAnswers } from "@/lib/assessment-scoring";
 import { createServiceClient } from "@/lib/supabase";
@@ -14,11 +15,16 @@ import type { ObjectiveBreakdown, SubmissionDetail } from "@/lib/types";
  * Admin-only per-question breakdown for objective submissions. Computed here
  * (behind the admin session) so the answer key never reaches the client.
  */
-function buildObjectiveBreakdown(submission: SubmissionDetail): ObjectiveBreakdown {
+function buildObjectiveBreakdown(
+  submission: SubmissionDetail,
+  version: ObjectiveAssessmentVersion,
+): ObjectiveBreakdown {
   const answers = Object.fromEntries(
     OBJECTIVE_QUESTION_IDS.map((id) => [id, submission[answerColumn(id)] ?? null]),
   ) as Parameters<typeof scoreObjectiveAnswers>[0];
-  const { results } = scoreObjectiveAnswers(answers);
+  // Grade against the key for the submission's OWN version, so older
+  // submissions are never re-graded against newer questions.
+  const { results } = scoreObjectiveAnswers(answers, version);
   return Object.fromEntries(
     OBJECTIVE_QUESTION_IDS.map((id) => [
       id,
@@ -51,10 +57,15 @@ export async function GET(
     }
     if (error) throw error;
 
-    const submission: SubmissionDetail =
-      data.assessment_version === OBJECTIVE_ASSESSMENT_VERSION
-        ? { ...data, objective_breakdown: buildObjectiveBreakdown(data) }
-        : data;
+    const submission: SubmissionDetail = isObjectiveVersion(data.assessment_version)
+      ? {
+          ...data,
+          objective_breakdown: buildObjectiveBreakdown(
+            data,
+            data.assessment_version,
+          ),
+        }
+      : data;
 
     return NextResponse.json({ submission });
   } catch (error) {

@@ -8,12 +8,12 @@ import {
   FINAL_MAX_SCORE,
   MANUAL_SCORE_MAX,
   MANUAL_SCORE_MIN,
-  OBJECTIVE_ASSESSMENT_VERSION,
   OBJECTIVE_MAX_SCORE,
   OBJECTIVE_QUESTIONS,
   Q21_OTHER_OPTION,
   Q21_QUESTION,
   Q22_QUESTION,
+  isObjectiveVersion,
 } from "@/lib/assessment";
 import { DEPARTMENT_CONTEXT_NOTES, displayDepartment } from "@/lib/constants";
 import type { Score, SubmissionDetail } from "@/lib/types";
@@ -354,7 +354,7 @@ function getScoreRecord(value: Score | Score[] | null) {
 }
 
 function isObjectiveSubmission(submission: SubmissionDetail) {
-  return submission.assessment_version === OBJECTIVE_ASSESSMENT_VERSION;
+  return isObjectiveVersion(submission.assessment_version);
 }
 
 type ManualKey = "q21_manual_score" | "q22_manual_score";

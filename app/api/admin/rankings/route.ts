@@ -4,8 +4,8 @@ import {
   FINAL_MAX_SCORE,
   LEGACY_FLAG_THRESHOLD,
   LEGACY_MAX_SCORE,
-  OBJECTIVE_ASSESSMENT_VERSION,
   OBJECTIVE_FLAG_THRESHOLD,
+  isObjectiveVersion,
 } from "@/lib/assessment";
 import { createServiceClient } from "@/lib/supabase";
 import type { AssessmentVersion, Ranking } from "@/lib/types";
@@ -51,7 +51,7 @@ function toRankingRow(row: RankingRow): Unranked | null {
     assessment_version: row.assessment_version,
   };
 
-  if (row.assessment_version === OBJECTIVE_ASSESSMENT_VERSION) {
+  if (isObjectiveVersion(row.assessment_version)) {
     if (
       row.final_score == null ||
       row.objective_score == null ||

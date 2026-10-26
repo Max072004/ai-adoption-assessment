@@ -2,14 +2,15 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import {
-  ANSWER_LETTERS,
   OBJECTIVE_QUESTIONS,
+  orderedQuestions,
   Q21_OTHER_OPTION,
   Q21_OTHER_PROMPT,
   Q21_QUESTION,
   Q21_TOOL_OPTIONS,
   Q22_QUESTION,
   type AnswerLetter,
+  type AssessmentOrder,
   type ObjectiveQuestionId,
   type Q21Tool,
 } from "@/lib/assessment";
@@ -152,7 +153,12 @@ function Question({
   );
 }
 
-/** Single-select A-D options for one objective question. */
+/**
+ * Single-select options for one objective question. `options` arrives already
+ * shuffled; each entry keeps its CANONICAL letter, which is what gets
+ * submitted. The A/B/C/D shown to the employee is just the display position,
+ * so two employees can see the same option under different labels.
+ */
 function ChoiceGroup({
   name,
   options,
@@ -160,17 +166,18 @@ function ChoiceGroup({
   onChange,
 }: {
   name: string;
-  options: Record<AnswerLetter, string>;
+  options: { letter: AnswerLetter; text: string }[];
   value: AnswerLetter | undefined;
   onChange: (value: AnswerLetter) => void;
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      {ANSWER_LETTERS.map((letter) => {
-        const selected = value === letter;
+      {options.map((option, index) => {
+        const selected = value === option.letter;
+        const displayLabel = String.fromCharCode(65 + index);
         return (
           <label
-            key={letter}
+            key={option.letter}
             className={`group relative flex min-h-16 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3.5 transition duration-200 ${
               selected
                 ? "border-indigo-500/70 bg-indigo-500/10 shadow-[0_0_0_3px_rgba(99,102,241,0.08)]"
@@ -181,9 +188,9 @@ function ChoiceGroup({
               className="sr-only"
               type="radio"
               name={name}
-              value={letter}
+              value={option.letter}
               checked={selected}
-              onChange={() => onChange(letter)}
+              onChange={() => onChange(option.letter)}
               required
             />
             <span
@@ -193,12 +200,12 @@ function ChoiceGroup({
                   : "border-zinc-700 text-zinc-500 group-hover:border-zinc-600"
               }`}
             >
-              {selected ? <CheckIcon className="h-3.5 w-3.5" /> : letter}
+              {selected ? <CheckIcon className="h-3.5 w-3.5" /> : displayLabel}
             </span>
             <span
               className={`text-sm leading-5 ${selected ? "text-white" : "text-zinc-400"}`}
             >
-              {options[letter]}
+              {option.text}
             </span>
           </label>
         );
@@ -255,7 +262,9 @@ function ToolCheckboxes({
   );
 }
 
-export function EmployeeForm() {
+export function EmployeeForm({ order }: { order: AssessmentOrder }) {
+  // Shuffled once on the server for this attempt; stable for the whole session.
+  const questions = useMemo(() => orderedQuestions(order), [order]);
   const [form, setForm] = useState(initialState);
   const [answers, setAnswers] = useState<Answers>({});
   const [tools, setTools] = useState<Set<Q21Tool>>(() => new Set());
@@ -504,7 +513,7 @@ export function EmployeeForm() {
             title="AI Knowledge Check"
             description={`Questions 1 to 20. Select one answer for each question. ${answeredCount} of ${OBJECTIVE_QUESTIONS.length} answered.`}
           >
-            {OBJECTIVE_QUESTIONS.map((question, index) => (
+            {questions.map((question, index) => (
               <Question
                 key={question.id}
                 number={`Q${index + 1}`}
@@ -512,7 +521,7 @@ export function EmployeeForm() {
               >
                 <ChoiceGroup
                   name={question.id}
-                  options={question.options}
+                  options={question.orderedOptions}
                   value={answers[question.id]}
                   onChange={(letter) =>
                     setAnswers((current) => ({ ...current, [question.id]: letter }))

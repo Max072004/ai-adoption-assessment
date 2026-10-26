@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/api";
-import { OBJECTIVE_ASSESSMENT_VERSION } from "@/lib/assessment";
+import { isObjectiveVersion } from "@/lib/assessment";
 import { DEPARTMENT_AAM } from "@/lib/constants";
 import { createServiceClient } from "@/lib/supabase";
 import { objectiveReviewSchema, scoreSchema } from "@/lib/validation";
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     }
     if (submissionError) throw submissionError;
 
-    if (submission.assessment_version === OBJECTIVE_ASSESSMENT_VERSION) {
+    if (isObjectiveVersion(submission.assessment_version)) {
       return saveObjectiveReview(supabase, submission, body);
     }
     return saveLegacyReview(supabase, submission, body);

@@ -1,11 +1,12 @@
 import type {
   AnswerLetter,
-  OBJECTIVE_ASSESSMENT_VERSION,
   ObjectiveAnswerColumn,
+  ObjectiveAssessmentVersion,
   ObjectiveQuestionId,
 } from "@/lib/assessment";
 
-export type AssessmentVersion = typeof OBJECTIVE_ASSESSMENT_VERSION;
+/** Any objective assessment version. Legacy Month 1/2/3 rows use null. */
+export type AssessmentVersion = ObjectiveAssessmentVersion;
 
 /** Q1-Q20 selected letters, keyed by database column (q1_answer ... q20_answer). */
 export type ObjectiveAnswerColumns = Record<ObjectiveAnswerColumn, AnswerLetter | null>;
@@ -17,7 +18,7 @@ export type Submission = ObjectiveAnswerColumns & {
   department: string;
   role: string;
   month_year: string;
-  /** null for legacy Month 1/2/3 rows; "objective_v1" for the final assessment. */
+  /** null for legacy Month 1/2/3 rows; an objective version for the current model. */
   assessment_version: AssessmentVersion | null;
   /** Q0 (legacy) / Q22 (objective) evidence link and uploaded proof. */
   q0_proof: string | null;
