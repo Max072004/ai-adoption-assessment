@@ -409,5 +409,16 @@ export const Q21_TOOL_OPTIONS = [
 export type Q21Tool = (typeof Q21_TOOL_OPTIONS)[number];
 export const Q21_OTHER_OPTION: Q21Tool = "Other";
 
+/**
+ * Q22 evidence upload limit.
+ *
+ * Vercel serverless functions reject request bodies over ~4.5 MB at the edge
+ * with a plain-text 413 (FUNCTION_PAYLOAD_TOO_LARGE) before any app code runs,
+ * so this MUST stay safely under that. Employees with larger evidence should
+ * use the link field instead.
+ */
+export const MAX_EVIDENCE_FILE_MB = 4;
+export const MAX_EVIDENCE_FILE_SIZE = MAX_EVIDENCE_FILE_MB * 1024 * 1024;
+
 export const Q22_QUESTION =
   "Share one example of AI-assisted work you completed this month.";

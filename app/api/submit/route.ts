@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   answerColumn,
+  MAX_EVIDENCE_FILE_MB,
+  MAX_EVIDENCE_FILE_SIZE,
   OBJECTIVE_ASSESSMENT_VERSION,
   OBJECTIVE_QUESTION_IDS,
 } from "@/lib/assessment";
@@ -11,7 +13,6 @@ import { objectiveSubmissionSchema } from "@/lib/validation";
 // Q22 evidence reuses the existing proof upload infrastructure (Q0 columns +
 // "proofs" storage bucket) introduced in migration 002.
 const PROOF_BUCKET = "proofs";
-const MAX_PROOF_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_PROOF_TYPES = new Map([
   ["image/png", "png"],
   ["image/jpeg", "jpg"],
@@ -93,9 +94,11 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
-      if (evidenceFile.size > MAX_PROOF_FILE_SIZE) {
+      if (evidenceFile.size > MAX_EVIDENCE_FILE_SIZE) {
         return NextResponse.json(
-          { error: "Please upload a Q22 evidence file smaller than 10 MB." },
+          {
+            error: `Please upload a Q22 evidence file smaller than ${MAX_EVIDENCE_FILE_MB} MB, or share a link instead.`,
+          },
           { status: 400 },
         );
       }

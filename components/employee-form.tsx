@@ -2,6 +2,8 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import {
+  MAX_EVIDENCE_FILE_MB,
+  MAX_EVIDENCE_FILE_SIZE,
   OBJECTIVE_QUESTIONS,
   orderedQuestions,
   Q21_OTHER_OPTION,
@@ -277,6 +279,20 @@ export function EmployeeForm({ order }: { order: AssessmentOrder }) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function selectEvidenceFile(file: File | null) {
+    if (file && file.size > MAX_EVIDENCE_FILE_SIZE) {
+      // Vercel rejects bodies over ~4.5 MB before the request reaches the API,
+      // so catch it here and tell the employee what to do instead.
+      setEvidenceFile(null);
+      setError(
+        `That file is ${(file.size / 1024 / 1024).toFixed(1)} MB. Please upload a file under ${MAX_EVIDENCE_FILE_MB} MB, or paste a link instead.`,
+      );
+      return;
+    }
+    setError("");
+    setEvidenceFile(file);
+  }
+
   function toggleTool(tool: Q21Tool) {
     setTools((current) => {
       const next = new Set(current);
@@ -333,10 +349,22 @@ export function EmployeeForm({ order }: { order: AssessmentOrder }) {
         method: "POST",
         body: formData,
       });
-      const data = await response.json();
+      // Platform-level failures (e.g. Vercel's 413) return plain text, so the
+      // body is parsed defensively and the status checked separately.
+      let data: { error?: string } | null = null;
+      try {
+        data = (await response.json()) as { error?: string };
+      } catch {
+        data = null;
+      }
 
       if (!response.ok) {
-        setError(data.error ?? "We could not submit your response. Please try again.");
+        setError(
+          response.status === 413
+            ? `That evidence file is too large to upload. Please use a file under ${MAX_EVIDENCE_FILE_MB} MB, or paste a link instead.`
+            : (data?.error ??
+              "We could not submit your response. Please try again."),
+        );
         return;
       }
 
@@ -570,7 +598,7 @@ export function EmployeeForm({ order }: { order: AssessmentOrder }) {
             <Question
               number="Q22"
               title={Q22_QUESTION}
-              helper="Required: share a link or upload a PNG, JPG, JPEG, or PDF file (up to 10 MB)."
+              helper={`Required: share a link or upload a PNG, JPG, JPEG, or PDF file (up to ${MAX_EVIDENCE_FILE_MB} MB).`}
             >
               <div className="space-y-4">
                 <label className="label">
@@ -585,13 +613,15 @@ export function EmployeeForm({ order }: { order: AssessmentOrder }) {
                 </label>
                 <label className="label">
                   Evidence file
-                  <span className="helper">Screenshot or PDF upload, up to 10 MB</span>
+                  <span className="helper">
+                    Screenshot or PDF upload, up to {MAX_EVIDENCE_FILE_MB} MB
+                  </span>
                   <input
                     className="field file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-xs file:font-medium file:text-zinc-200 hover:file:bg-zinc-700"
                     type="file"
                     accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf"
                     onChange={(event) =>
-                      setEvidenceFile(event.target.files?.item(0) ?? null)
+                      selectEvidenceFile(event.target.files?.item(0) ?? null)
                     }
                   />
                 </label>
